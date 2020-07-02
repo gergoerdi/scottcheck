@@ -57,14 +57,6 @@ verb_drop = 18
 say :: (MonadInteractive m) => String -> Engine m ()
 say = lift . lift . emit
 
-isDark :: (MonadInteractive m) => Engine m Bool
-isDark = do
-    items <- use itemLocations
-    if snd (bounds items) < 9 then return False else do
-        let lightLoc = items ! 9
-        here <- use currentRoom
-        return $ lightLoc `elem` [here, carried]
-
 finished :: (MonadInteractive m) => Engine m (Maybe Bool)
 finished = do
     dead <- use dead
@@ -93,7 +85,6 @@ runGame game = flip evalStateT s0 $ flip runReaderT game $ untilJust $ do
             (verb, noun) <- askInput
             handled <- perform (verb, noun)
             unless handled $ say "I don't understand."
-            updateLight
 
 builtin :: (MonadInteractive m) => (Int16, Int16) -> Engine m Bool
 builtin (verb, noun)
@@ -107,9 +98,6 @@ builtin (verb, noun)
             say "Go in which direction?"
             return True
         (subtract 1 -> dir) | 0 <= dir && dir <= 5 -> do
-            dark <- isDark
-            when dark $ say "Dangerous to move in the dark!"
-
             rooms <- asks gameRooms
             Room exits _ <- uses currentRoom (rooms !)
             let newRoom = exits !! fromIntegral dir
@@ -117,9 +105,6 @@ builtin (verb, noun)
             if newRoom /= 0 then do
                 currentRoom .= newRoom
                 lookNow
-              else if dark then do
-                say "I fell down and broke my neck."
-                die
               else do
                 say "I can't go in that direction."
             return True
@@ -183,19 +168,19 @@ performMatching (verb, noun) = do
 
 evalCond :: (MonadInteractive m) => Condition -> Engine m (Bool, Maybe Int16)
 evalCond (0, dat) = return (True, Just dat)
-evalCond (op, dat) = fmap (, Nothing) $ case op of
-    1 -> isItemAt dat 255
-    2 -> isItemAt dat =<< use currentRoom
-    4 -> uses currentRoom (== dat)
-    6 -> not <$> isItemAt dat 255
-    12 -> do
-        loc <- uses itemLocations (! dat)
-        here <- use currentRoom
-        return $ loc `notElem` [255, here]
-  where
-    isItemAt item room = do
-        loc <- uses itemLocations (! item)
-        return $ loc == room
+-- evalCond (op, dat) = fmap (, Nothing) $ case op of
+--     1 -> isItemAt dat 255
+--     2 -> isItemAt dat =<< use currentRoom
+--     4 -> uses currentRoom (== dat)
+--     6 -> not <$> isItemAt dat 255
+--     12 -> do
+--         loc <- uses itemLocations (! dat)
+--         here <- use currentRoom
+--         return $ loc `notElem` [255, here]
+--   where
+--     isItemAt item room = do
+--         loc <- uses itemLocations (! item)
+--         return $ loc == room
 
 data InstrResult
     = Done
@@ -231,36 +216,36 @@ score = do
     return $ sum [ 1 | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items), loc == treasury]
 
 evalInstr :: (MonadInteractive m) => Instr -> Exec m InstrResult
-evalInstr instr
-  | 1 <= instr && instr <= 51 = msg instr >> return Done
-  | 102 <= instr = msg (instr - 50) >> return Done
+-- evalInstr instr
+--   | 1 <= instr && instr <= 51 = msg instr >> return Done
+--   | 102 <= instr = msg (instr - 50) >> return Done
 evalInstr 0 = return Done
-evalInstr 54 = do
-    room <- nextArg
-    lift $ currentRoom .= room
-    lift $ needLook .= True
-    return Done
-evalInstr 63 = lift die >> return Done
-evalInstr 64 = lift lookNow >> return Done
-evalInstr 65 = lift $ do
-    score <- score
-    numTreasures <- asks gameMaxScore
-    let percentage = 100 * fromIntegral score / fromIntegral numTreasures :: Double
-    say $ printf "I've stored %d treasures." score
-    say $ printf "On a scale of 0 to 100, that rates %.0f." percentage
-    return Done
-evalInstr 66 = lift (say "TODO: INVENTORY") >> return Done
-evalInstr 72 = do
-    item1 <- nextArg
-    item2 <- nextArg
-    lift $ do
-        here <- use currentRoom
-        loc1 <- uses itemLocations (! item1)
-        loc2 <- uses itemLocations (! item2)
-        when (loc1 == here || loc2 == here) $ needLook .= True
-        move item1 loc2
-        move item2 loc1
-    return Done
+-- evalInstr 54 = do
+--     room <- nextArg
+--     lift $ currentRoom .= room
+--     lift $ needLook .= True
+--     return Done
+-- evalInstr 63 = lift die >> return Done
+-- evalInstr 64 = lift lookNow >> return Done
+-- evalInstr 65 = lift $ do
+--     score <- score
+--     numTreasures <- asks gameMaxScore
+--     let percentage = 100 * fromIntegral score / fromIntegral numTreasures :: Double
+--     say $ printf "I've stored %d treasures." score
+--     say $ printf "On a scale of 0 to 100, that rates %.0f." percentage
+--     return Done
+-- evalInstr 66 = lift (say "TODO: INVENTORY") >> return Done
+-- evalInstr 72 = do
+--     item1 <- nextArg
+--     item2 <- nextArg
+--     lift $ do
+--         here <- use currentRoom
+--         loc1 <- uses itemLocations (! item1)
+--         loc2 <- uses itemLocations (! item2)
+--         when (loc1 == here || loc2 == here) $ needLook .= True
+--         move item1 loc2
+--         move item2 loc1
+--     return Done
 evalInstr instr = error $ unwords ["evalInstr", show instr]
 
 
@@ -276,13 +261,8 @@ look = do
 
 lookNow :: (MonadInteractive m) => Engine m ()
 lookNow = do
-    dark <- isDark
-    if dark then do
-        say "I can't see. It is too dark!"
-        say ""
-      else do
-        lookRoom
-        lookItems
+    lookRoom
+    lookItems
   where
     lookRoom = do
         here <- use currentRoom
@@ -325,9 +305,6 @@ askInput = do
         _ -> do
             say "Unknown words"
             askInput
-
-updateLight :: (MonadInteractive m) => Engine m ()
-updateLight = return () -- TODO
 
 die :: (MonadInteractive m) => Engine m ()
 die = do
