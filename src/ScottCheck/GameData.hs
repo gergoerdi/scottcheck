@@ -13,9 +13,12 @@ data Game = Game
     , gameMaxScore :: Int16
     , gameLampTime :: Int16
     , gameWordLength :: Int16
+    , gameDictSize :: Int16
     , gameItems :: Array Int16 Item
     , gameActions :: [Action]
+    , gameVerbsRaw :: Array Int16 String
     , gameVerbs :: Map String Int16
+    , gameNounsRaw :: Array Int16 String
     , gameNouns :: Map String Int16
     , gameRooms :: Array Int16 Room
     , gameMessages :: Array Int16 String

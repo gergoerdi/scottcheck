@@ -61,7 +61,7 @@ game = do
     _ <- num
     numItems <- cardinality
     numActions <- cardinality
-    numWords <- cardinality
+    gameDictSize <- cardinality
     numRooms <- cardinality
     gameMaxLoad <- num
     gameStartRoom <- num
@@ -72,8 +72,10 @@ game = do
     gameTreasury <- num
 
     gameActions <- replicateM (fromIntegral numActions) action
-    (verbs, nouns) <- unzip <$> replicateM(fromIntegral numWords) ((,) <$> str <*> str)
-    let gameVerbs = M.fromList $ zip verbs [0..]
+    (verbs, nouns) <- unzip <$> replicateM(fromIntegral gameDictSize) ((,) <$> str <*> str)
+    let gameVerbsRaw = listArray (0, fromIntegral gameDictSize - 1) verbs
+        gameVerbs = M.fromList $ zip verbs [0..]
+        gameNounsRaw = listArray (0, fromIntegral gameDictSize - 1) nouns
         gameNouns = M.fromList $ zip nouns [0..]
 
     gameRooms <- parseArray numRooms room

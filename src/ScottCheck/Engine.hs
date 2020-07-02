@@ -1,9 +1,6 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 module ScottCheck.Engine where
-    -- ( MonadInteractive(..)
-    -- , runGame
-    -- ) where
 
 import ScottCheck.GameData
 import ScottCheck.Utils
@@ -12,7 +9,6 @@ import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Writer
 import Data.SBV.MTL ()
--- import Control.Monad.Except
 
 import Control.Lens
 import Control.Monad
@@ -30,22 +26,6 @@ import GHC.Generics (Generic)
 import Data.SBV
 import Data.SBV.Maybe (sNothing, sJust)
 import qualified Data.SBV.Maybe as SBV
--- import Data.SBV.String ((.++))
--- import Data.SBV.Trans
-
--- class (Monad m) => MonadInteractive m where
---     emit :: String -> m ()
---     input :: m (String, String)
-
--- instance MonadInteractive IO where
---     emit = putStrLn
---     input = do
---         putStr "> "
---         line <- getLine
---         return $ case words line of
---             (w1:w2:_) -> (w1, w2)
---             [w1] -> (w1, "")
---             [] -> ("", "")
 
 data S = S
     { _currentRoom :: SInt16
@@ -55,9 +35,7 @@ data S = S
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
--- type BaseM = SymbolicT (WriterT [SString] IO)
-type BaseM = Writer [SString]
-type Engine = ReaderT Game (StateT S BaseM)
+type Engine = ReaderT Game (StateT S (Writer [SString]))
 
 dirNames :: [String]
 dirNames = ["North", "South", "East", "West", "Up", "Down"]
@@ -71,7 +49,7 @@ say = lift . lift . tell . (:[])
 say_ :: String -> Engine ()
 say_ = say . literal
 
-runGame :: Game -> Engine a -> BaseM a
+runGame :: Game -> Engine a -> Writer [SString] a
 runGame game act = evalStateT (runReaderT act game) s0
   where
     s0 = S
@@ -102,10 +80,6 @@ look = do
     here <- use currentRoom
     SRoom exits desc <- asks $ (.! here) . fmap sRoom . gameRooms
     say desc
-    -- let availableExits = [ dir | (dir, nextRoom) <- zip dirNames exits, nextRoom ./= 0 ]
-    -- unless (null availableExits) $ do
-    --     say_ $ "Obvious exits: " <> intercalate ", " availableExits
-    --     say_ ""
 
     itemLocs <- use itemLocations
     items <- asks gameItems
@@ -145,53 +119,6 @@ parseInput Game{..} w1 w2 = case (verb, noun) of
     parse dict s = M.lookup (normalize s) dict
 
     normalize = map toUpper . take (fromIntegral gameWordLength)
-
-
--- askInput :: (MonadInteractive m) => Engine m (Int16, Int16)
--- askInput = do
---     wordLen <- asks gameWordLength
---     verbs <- asks gameVerbs
---     nouns <- asks gameNouns
---     let parse dict s = case s of
---             "" -> Just (-1)
---             s -> M.lookup s' dict
---           where
---             s' = take (fromIntegral wordLen) . map toUpper $ s
-
---     (w1, w2) <- lift . lift $ input
-
---     let verb = parse verbs w1
---         noun = parse nouns w2
---     case (verb, noun) of
---         (Just (-1), Just (-1)) -> askInput
---         (Nothing, Just (-1)) | Just dir <- parse nouns w1, 1 <= dir && dir <= 6 -> return (1, dir)
---         (Just verb, Just noun) -> return (verb, noun)
---         _ -> do
---             say "Unknown words"
---             askInput
-
-
-    -- runGame :: (MonadInteractive m) => Game -> m Bool
--- runGame game = flip evalStateT s0 $ flip runReaderT game $ untilJust $ do
---     gameTurn
---     finished
---   where
---     s0 = S
---         { _currentRoom = gameStartRoom game
---         , _needLook = True
---         , _itemLocations = fmap (\(Item _ _ _ loc) -> loc) $ gameItems game
---         , _dead = False
---         }
-
---     gameTurn = do
---         look
---         perform (0, 0)
---         look
---         done <- isJust <$> finished
---         unless done $ do
---             (verb, noun) <- askInput
---             handled <- perform (verb, noun)
---             unless handled $ say "I don't understand."
 
 builtin :: (SInt16, SInt16) -> Engine SBool
 builtin (verb, noun) = sCase verb (return sFalse)
@@ -244,114 +171,6 @@ perform (verb, noun) = do
 performMatching :: (SInt16, SInt16) -> Engine SBool
 performMatching (verb, noun) = return sFalse
 
--- performMatching (verb, noun) = do
---     actions <- asks gameActions
---     flip evalStateT actions $ loop False
---   where
---     loop handled = do
---         action <- getNext
---         -- traceShow (verb, noun, action) $ return ()
---         case action of
---             Nothing -> return handled
---             Just (Action (verb', noun') conds instrs)
---               | verb' == verb, verb' == 0 || (noun' `elem` [0, noun]) -> do
---                   result <- lift $ do
---                       (bs, args) <- unzip <$> mapM evalCond conds
---                       args <- return $ catMaybes args
---                       if and bs then {- traceShow action $ -} flip evalStateT args $ evalInstrs instrs else return NoMatch
---                   case result of
---                       Done | verb /= 0 -> return True
---                            | otherwise -> loop True
---                       Continue -> loop True
---                       NoMatch -> loop handled
---             _ -> loop handled
-
--- evalCond :: (MonadInteractive m) => Condition -> Engine m (Bool, Maybe Int16)
--- evalCond (0, dat) = return (True, Just dat)
--- -- evalCond (op, dat) = fmap (, Nothing) $ case op of
--- --     1 -> isItemAt dat carried
--- --     2 -> isItemAt dat =<< use currentRoom
--- --     4 -> uses currentRoom (== dat)
--- --     6 -> not <$> isItemAt dat carried
--- --     12 -> do
--- --         loc <- uses itemLocations (! dat)
--- --         here <- use currentRoom
--- --         return $ loc `notElem` [carried, here]
--- --   where
--- --     isItemAt item room = do
--- --         loc <- uses itemLocations (! item)
--- --         return $ loc == room
-
--- data InstrResult
---     = Done
---     | Continue
---     | NoMatch
---     deriving (Show)
-
--- type Exec m = StateT [Int16] (Engine m)
-
--- nextArg :: (MonadInteractive m) => Exec m Int16
--- nextArg = fromJust <$> getNext
-
--- getNext :: (MonadState [a] m) => m (Maybe a)
--- getNext = do
---     xs <- get
---     case xs of
---         (x:xs) -> do
---             put xs
---             return $ Just x
---         [] -> return Nothing
-
--- evalInstrs :: (MonadInteractive m) => [Instr] -> Exec m InstrResult
--- -- evalInstrs [] =
--- evalInstrs instrs = do
---     mapM_ evalInstr instrs
---     return Done -- TODO: return Continue if any instr returns Continue
-
--- evalInstr :: (MonadInteractive m) => Instr -> Exec m InstrResult
--- -- evalInstr instr
--- --   | 1 <= instr && instr <= 51 = msg instr >> return Done
--- --   | 102 <= instr = msg (instr - 50) >> return Done
--- evalInstr 0 = return Done
--- -- evalInstr 54 = do
--- --     room <- nextArg
--- --     lift $ currentRoom .= room
--- --     lift $ needLook .= True
--- --     return Done
--- -- evalInstr 63 = lift die >> return Done
--- -- evalInstr 64 = lift lookNow >> return Done
--- -- evalInstr 65 = lift $ do
--- --     score <- score
--- --     numTreasures <- asks gameMaxScore
--- --     let percentage = 100 * fromIntegral score / fromIntegral numTreasures :: Double
--- --     say $ printf "I've stored %d treasures." score
--- --     say $ printf "On a scale of 0 to 100, that rates %.0f." percentage
--- --     return Done
--- -- evalInstr 66 = lift (say "TODO: INVENTORY") >> return Done
--- -- evalInstr 72 = do
--- --     item1 <- nextArg
--- --     item2 <- nextArg
--- --     lift $ do
--- --         here <- use currentRoom
--- --         loc1 <- uses itemLocations (! item1)
--- --         loc2 <- uses itemLocations (! item2)
--- --         when (loc1 == here || loc2 == here) $ needLook .= True
--- --         move item1 loc2
--- --         move item2 loc1
--- --     return Done
--- evalInstr instr = error $ unwords ["evalInstr", show instr]
-
-
--- msg :: (MonadInteractive m) => Int16 -> Exec m ()
--- msg i = lift $ do
---     s <- asks $ (! i) . gameMessages
---     say s
-
--- die :: (MonadInteractive m) => Engine m ()
--- die = do
---     say "The game is now over"
---     dead .= sTrue
---     return () -- TODO
 
 move :: SInt16 -> SInt16 -> Engine ()
 move item loc = itemLocations %= replaceAt item loc
