@@ -146,7 +146,7 @@ builtin (verb, noun) = sCase verb (return sFalse)
         locs <- use itemLocations
         here <- use currentRoom
         items <- asks gameItems
-        let item = SBV.fromJust $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
         ite (select (A.elems locs) (-1) item ./= here) (say_ "It's beyond my power to do that.") $ do
             move item (literal carried)
             say_ "OK."
@@ -156,7 +156,7 @@ builtin (verb, noun) = sCase verb (return sFalse)
         locs <- use itemLocations
         here <- use currentRoom
         items <- asks gameItems
-        let item = SBV.fromJust $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
         ite (select (A.elems locs) (-1) item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
             move item here
             say_ "OK."
