@@ -4,6 +4,7 @@ module Main where
 import Data.Attoparsec.Text (parseOnly)
 import qualified Data.Text.IO as T
 import System.IO
+import System.Exit
 
 import ScottCheck.GameData
 import ScottCheck.Parse
@@ -56,13 +57,15 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    let play cmds = runWriter $ runGame theGame $ do
-            forM_ cmds $ \(v, n) -> do
+    let play = runWriter . runGame theGame . go
+          where
+            go [] = finished
+            go ((v, n):cmds) = do
                 end1 <- stepWorld
-                ite (SBV.isJust end1) (return end1) $ stepPlayer (v, n)
-            finished
+                end2 <- ite (SBV.isJust end1) (return end1) $ stepPlayer (v, n)
+                ite (SBV.isJust end2) (return end2) $ go cmds
 
-    SatResult r <- sat $ do
+    result <- sat $ do
         cmds <- forM [1..inputLength] $ \i -> do
             let word name = do
                     var <- free $ printf "%s@%d" name (i :: Int)
@@ -73,23 +76,26 @@ main = do
             return (v, n)
         return $ SBV.fromMaybe sFalse $ fst $ play cmds
 
-    let solution = case r of
-            Unsatisfiable _ _ -> error "Cannot solve"
-            Satisfiable _config SMTModel{..} -> zip
-                                                (map (resolve gameVerbsRaw . snd) . sortBy (comparing fst) $ verbs)
-                                                (map (resolve gameNounsRaw . snd) . sortBy (comparing fst) $ nouns)
-              where
-                assocs =
-                    [ (either (Left . (,val)) (Right . (,val)) what)
-                    | (name, CV _ (CInteger val)) <- modelAssocs
-                    , Just what <- return $ classify name
-                    ]
-                (verbs, nouns) = partitionEithers assocs
-                resolve arr w = arr theGame ! fromIntegral w
+    solution <- case result of
+        SatResult (Satisfiable _config SMTModel{..}) -> return $ zip (ordered verbs) (ordered nouns)
           where
+            assocs =
+                [ (either (Left . (,val)) (Right . (,val)) what)
+                | (name, CV _ (CInteger val0)) <- modelAssocs
+                , Just what <- return $ classify name
+                , let val = fromInteger val0
+                ]
+
+            (verbs, nouns) = partitionEithers assocs
+            ordered = map snd . sortBy (comparing fst)
+
             classify s = msum
                 [ Left . read @Int <$> stripPrefix "verb@" s
                 , Right . read @Int <$> stripPrefix "noun@" s
                 ]
+        _ -> do
+            print result
+            exitWith (ExitFailure 1)
 
-    forM_ solution $ \(w1, w2) -> printf "> %s %s\n" w1 w2
+    let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
+    forM_ (map resolve solution) $ \(w1, w2) -> printf "> %s %s\n" w1 w2
