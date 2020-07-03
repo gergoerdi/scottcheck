@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
+{-# LANGUAGE FlexibleContexts #-}
 module ScottCheck.Engine where
 
 import ScottCheck.GameData
@@ -16,16 +17,21 @@ import Control.Monad.Loops
 import Data.List (elemIndex, intercalate)
 import Data.Char (toUpper)
 import Data.Maybe
-import Debug.Trace
 import Data.Int
 import Text.Printf
 import qualified Data.Map as M
 import Data.Array as A
+import Data.Bifunctor
+import Data.Either (partitionEithers)
+
+import Debug.Trace
 
 import GHC.Generics (Generic)
 import Data.SBV
 import Data.SBV.Maybe (sNothing, sJust)
 import qualified Data.SBV.Maybe as SBV
+
+type SInput = (SInt16, SInt16)
 
 data S = S
     { _currentRoom :: SInt16
@@ -65,7 +71,7 @@ stepWorld = do
     look
     finished
 
-stepPlayer :: (SInt16, SInt16) -> Engine (SMaybe Bool)
+stepPlayer :: SInput -> Engine (SMaybe Bool)
 stepPlayer (v, n) = do
     perform (v, n)
     finished
@@ -97,16 +103,25 @@ score = do
     let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
     return $ count (.== literal treasury) treasureLocs
 
+die :: Engine ()
+die = dead .= sTrue
+
 finished :: Engine (SMaybe Bool)
 finished = do
     dead <- use dead
-    score <- score
+
     maxScore <- asks gameMaxScore
+    treasury <- asks gameTreasury
+    items <- asks gameItems
+    itemLocations <- use itemLocations
+    let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
+    let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
+
     return $ ite dead (sJust sFalse) $
-      ite (score .== literal maxScore) (sJust sTrue) $
+      ite haveAllTreasure (sJust sTrue) $
       sNothing
 
-parseInput :: Game -> String -> String -> Maybe (Int16, Int16)
+parseInput :: Game -> String -> String -> Maybe Input
 parseInput Game{..} w1 w2 = case (verb, noun) of
     (Nothing, Just (-1)) | Just dir <- parse gameNouns w1, 1 <= dir && dir <= 6 -> Just (1, dir)
     (Just verb, Just noun) -> Just (verb, noun)
@@ -120,7 +135,7 @@ parseInput Game{..} w1 w2 = case (verb, noun) of
 
     normalize = map toUpper . take (fromIntegral gameWordLength)
 
-builtin :: (SInt16, SInt16) -> Engine SBool
+builtin :: SInput -> Engine SBool
 builtin (verb, noun) = sCase verb (return sFalse)
     [ (1, builtin_go)
     , (10, builtin_get)
@@ -162,15 +177,110 @@ builtin (verb, noun) = sCase verb (return sFalse)
             say_ "OK."
         return sTrue
 
-perform :: (SInt16, SInt16) -> Engine ()
+perform :: SInput -> Engine ()
 perform (verb, noun) = do
     handled <- performMatching (verb, noun)
     sUnless handled $ void $ builtin (verb, noun)
     return ()
 
-performMatching :: (SInt16, SInt16) -> Engine SBool
-performMatching (verb, noun) = return sFalse
+type SCondition = (SInt16, SInt16)
+type SInstr = SInt16
 
+data SAction = SAction SInput [SCondition] [SInstr] deriving (Show, Generic, Mergeable)
+
+sAction :: Action -> SAction
+sAction (Action input conds instrs) = SAction (bimap literal literal input) (map (bimap literal literal) conds) (map literal instrs)
+
+performMatching :: SInput -> Engine SBool
+performMatching (verb, noun) = do
+    actions <- asks $ fmap sAction . gameActions
+    loop sFalse actions
+  where
+    loop handled [] = return handled
+    loop handled (action@(SAction (verb', noun') conds instrs):actions) = do
+        ite (sNot $ match (verb', noun')) (loop handled actions) $ do
+            this <- do
+                (bs, args) <- partitionEithers <$> mapM evalCond conds
+                let b = sAnd bs
+                ite b (exec args instrs) (return sFalse)
+            ite this (ite auto (loop sTrue actions) (return sTrue)) (loop handled actions)
+
+    match (verb', noun') = verb' .== verb .&& (auto .|| noun' .== 0 .|| noun' .== noun)
+    auto = verb .== 0
+
+evalCond :: (SInt16, SInt16) -> Engine (Either SBool SInt16)
+evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
+    sCase op (return sTrue)
+      [ (1, isItemAt (literal carried))
+      , (2, isItemAt =<< use currentRoom)
+      , (4, uses currentRoom (.== dat))
+      , (6, sNot <$> isItemAt (literal carried))
+      , (12, sNot <$> itemAvailable)
+      ]
+  where
+    isItemAt room = do
+        loc <- uses itemLocations (.! dat)
+        return $ loc .== room
+
+    itemAvailable = do
+        loc <- uses itemLocations (.! dat)
+        here <- use currentRoom
+        return $ loc .== literal carried .|| loc .== here
+
+type Exec = StateT [SInt16] Engine
+
+nextArg :: Exec SInt16
+nextArg = do
+    xs <- get
+    case xs of
+        (x:xs) -> do
+            put xs
+            return x
+        [] -> error "Out of args"
+
+exec :: [SInt16] -> [SInstr] -> Engine SBool
+exec args instrs = flip evalStateT args $ do
+    mapM_ execInstr instrs
+    return sTrue
+
+execInstr :: SInstr -> Exec SBool
+execInstr instr =
+    ite (1 .<= instr .&& instr .<= 51) (msg instr) $
+    ite (102 .<= instr) (msg $ instr - 50) $
+    sCase instr (return sTrue)
+    [ (0, return sTrue)
+    , (54, teleport)
+    , (63, gameOver)
+    , (64, lookAround)
+    , (65, showScore)
+    , (66, showInventory)
+    , (72, swapItems)
+    ]
+  where
+    handler act = act *> return sTrue
+
+    msg i = handler $ lift $ do
+        s <- asks $ (.! i) . fmap literal . gameMessages
+        say s
+
+    teleport = handler $ do
+        room <- nextArg
+        lift $ currentRoom .= room
+
+    gameOver = handler $ lift die
+
+    showScore = handler $ lift $ say_ "SCORE"
+    showInventory = handler $ lift $ say_ "INVENTORY"
+    lookAround = handler $ lift look
+
+    swapItems = handler $ do
+        item1 <- nextArg
+        item2 <- nextArg
+        lift $ do
+            loc1 <- uses itemLocations (.! item1)
+            loc2 <- uses itemLocations (.! item2)
+            move item1 loc2
+            move item2 loc1
 
 move :: SInt16 -> SInt16 -> Engine ()
 move item loc = itemLocations %= replaceAt item loc
