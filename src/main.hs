@@ -28,17 +28,10 @@ import Control.Monad
 
 data Options = Options
     { filePath :: FilePath
-    , inputLength :: Int
     }
 
 options :: Parser Options
 options = do
-    inputLength <- option auto $ mconcat
-        [ long "input-length"
-        , short 'n'
-        , metavar "LENGTH"
-        , help "How many commands to input"
-        ]
     filePath <- strArgument $ mconcat
         [ metavar "FILENAME"
         ]
