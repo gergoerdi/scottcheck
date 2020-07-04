@@ -10,7 +10,6 @@ import ScottCheck.GameData
 import ScottCheck.Parse
 import ScottCheck.Engine
 
-import Control.Monad.Writer
 import qualified Data.Map as M
 import Data.SBV hiding (options)
 import Data.SBV.Internals (SMTModel(..), CV(..), CVal(..))
@@ -22,6 +21,7 @@ import Data.Ord (comparing)
 import Data.Either
 import Data.Array
 import Options.Applicative
+import Control.Monad
 
 data Options = Options
     { filePath :: FilePath
@@ -57,7 +57,7 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    let play = runWriter . runGame theGame . go
+    let play = runGame theGame . go
           where
             go [] = finished
             go ((v, n):cmds) = do
@@ -65,7 +65,7 @@ main = do
                 end2 <- ite (SBV.isJust end1) (return end1) $ stepPlayer (v, n)
                 ite (SBV.isJust end2) (return end2) $ go cmds
 
-    result <- sat $ do
+    result <- satWith z3{ verbose = True } $ do
         cmds <- forM [1..inputLength] $ \i -> do
             let word name = do
                     var <- free $ printf "%s@%d" name (i :: Int)

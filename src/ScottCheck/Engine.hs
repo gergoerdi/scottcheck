@@ -6,9 +6,8 @@ module ScottCheck.Engine where
 import ScottCheck.GameData
 import ScottCheck.Utils
 
+import Control.Monad.RWS
 import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Writer
 import Data.SBV.MTL ()
 
 import Control.Lens
@@ -41,7 +40,7 @@ data S = S
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
-type Engine = ReaderT Game (StateT S (Writer [SString]))
+type Engine = RWS Game [SString] S
 
 dirNames :: [String]
 dirNames = ["North", "South", "East", "West", "Up", "Down"]
@@ -50,13 +49,13 @@ carried :: Int16
 carried = 255
 
 say :: SString -> Engine ()
-say = lift . lift . tell . (:[])
+say = tell . (:[])
 
 say_ :: String -> Engine ()
 say_ = say . literal
 
-runGame :: Game -> Engine a -> Writer [SString] a
-runGame game act = evalStateT (runReaderT act game) s0
+runGame :: Game -> Engine a -> (a, [SString])
+runGame game act = evalRWS act game s0
   where
     s0 = S
         { _currentRoom = literal $ gameStartRoom game
