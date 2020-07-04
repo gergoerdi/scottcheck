@@ -1,0 +1,84 @@
+0
+6
+10
+18
+5
+-1
+3
+1
+3
+-1
+7
+1
+
+300 0 0 0 0 0 9750 0
+450 0 0 0 0 0 9900 0
+600 0 0 0 0 0 9600 0
+25 64 0 0 0 0 150 0
+757 42 72 0 0 0 300 0
+757 42 40 80 0 0 10803 9600
+157 82 80 0 0 0 8164 0
+100 122 21 0 0 0 600 0
+100 122 26 0 0 0 750 0
+25 122 26 0 0 0 963 0
+1508 122 26 0 0 0 1050 0
+
+"AUT" "ANY"
+"GO" "NOR"
+"SCO" "SOU"
+"INV" "EAS"
+"LOO" "WES"
+"OPE" "UP"
+"" "DOW"
+"" "DOO"
+"" "KEY"
+"" "CRO"
+"GET" "COI"
+"" ""
+"" ""
+"" ""
+"" ""
+"" ""
+"" ""
+"" ""
+"DRO" ""
+
+0 0 0 0 0 0 ""
+0 2 0 0 0 0 "gorgeously decorated throne room"
+1 0 3 0 0 0 "square chamber"
+5 0 0 2 0 0 "gloomy dungeon"
+3 0 0 0 0 0 "dungeon cell"
+0 3 0 0 0 0 "damp, dismal crypt"
+
+""
+"I smell something rotting to the north."
+"It's locked."
+"OK"
+"Vampire cowers away from the cross!"
+"Vampire looks hungrily at me."
+"Vampire bites me!  I'm dead!"
+"I'm not going anywhere near that vampire!"
+
+"Sign says: leave treasure here, then say SCORE" 1
+"Wooden cross/CRO/" 2
+"Locked door" 3
+"Brass key/KEY/" 5
+"Open door leads south" 0
+"*Gold coin*/COI/" 4
+"Vampire" 5
+
+""
+""
+""
+""
+""
+""
+""
+""
+""
+"vampire can attack unless cross is carried"
+""
+
+0
+0
+0
