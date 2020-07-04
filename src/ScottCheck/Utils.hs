@@ -3,6 +3,8 @@ module ScottCheck.Utils where
 import Data.Array as A
 
 import Data.SBV
+import Data.SBV.Control
+import Control.Monad.State
 import Data.SBV.Maybe (sJust, sNothing)
 
 (.!) :: (Mergeable a) => Array Int16 a -> SInt16 -> a
@@ -37,3 +39,25 @@ sFindIndex p = go 0
   where
     go i [] = sNothing
     go i (x:xs) = ite (p x) (sJust i) (go (i + 1) xs)
+
+
+loopState :: (SMTValue i) => (Int -> Query (SBV i)) -> s -> (SBV i -> State s SBool) -> Query [i]
+loopState genCmd s0 step = go 1 s0 []
+  where
+    go i s cmds = do
+        io $ putStrLn $ "Searching at depth: " ++ show i
+
+        cmd <- genCmd i
+        let cmds' = cmds ++ [cmd]
+
+        push 1
+        let (finished, s') = runState (step cmd) s
+        constrain finished
+        cs <- checkSat
+
+        case cs of
+            Unk -> error $ "Solver said Unknown, depth: " ++ show i
+            Unsat -> do
+                pop 1
+                go (i+1) s' cmds'
+            Sat -> mapM getValue cmds'

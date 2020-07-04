@@ -9,11 +9,14 @@ import System.Exit
 import ScottCheck.GameData
 import ScottCheck.Parse
 import ScottCheck.Engine
+import ScottCheck.Utils
 
 import qualified Data.Map as M
 import Data.SBV hiding (options)
+import Data.SBV.Control
 import Data.SBV.Internals (SMTModel(..), CV(..), CVal(..))
 import qualified Data.SBV.Maybe as SBV
+import qualified Data.SBV.Tuple as SBV
 import Debug.Trace
 import Text.Printf
 import Data.List (stripPrefix, sortBy)
@@ -57,45 +60,25 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    let play = runGame theGame . go
-          where
-            go [] = finished
-            go ((v, n):cmds) = do
+    let genWord name i = do
+            word <- freshVar $ printf "%s@%d" name (i :: Int)
+            constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
+            return word
+        genInput i = do
+            verb <- genWord "verb" i
+            noun <- genWord "noun" i
+            return $ SBV.tuple (verb, noun)
+
+    cmds <- runSMTWith z3{ verbose = True} $ do
+        query $ loopState genInput (initState theGame) $ \cmd -> do
+            let (verb, noun) = SBV.untuple cmd
+            (finished, output) <- runGame theGame $ do
                 end1 <- stepWorld
-                end2 <- ite (SBV.isJust end1) (return end1) $ stepPlayer (v, n)
-                ite (SBV.isJust end2) (return end2) $ go cmds
-
-    result <- satWith z3{ verbose = True } $ do
-        cmds <- forM [1..inputLength] $ \i -> do
-            let word name = do
-                    var <- free $ printf "%s@%d" name (i :: Int)
-                    constrain $ 0 .<= var .&& var .< literal (gameDictSize theGame)
-                    return var
-            v <- word "verb"
-            n <- word "noun"
-            return (v, n)
-        return $ SBV.fromMaybe sFalse $ fst $ play cmds
-
-    solution <- case result of
-        SatResult (Satisfiable _config SMTModel{..}) -> return $ zip (ordered verbs) (ordered nouns)
-          where
-            assocs =
-                [ (either (Left . (,val)) (Right . (,val)) what)
-                | (name, CV _ (CInteger val0)) <- modelAssocs
-                , Just what <- return $ classify name
-                , let val = fromInteger val0
-                ]
-
-            (verbs, nouns) = partitionEithers assocs
-            ordered = map snd . sortBy (comparing fst)
-
-            classify s = msum
-                [ Left . read @Int <$> stripPrefix "verb@" s
-                , Right . read @Int <$> stripPrefix "noun@" s
-                ]
-        _ -> do
-            print result
-            exitWith (ExitFailure 1)
+                ite (SBV.isJust end1) (return $ SBV.fromJust end1) $ do
+                    end2 <- stepPlayer (verb, noun)
+                    ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
+            return finished
 
     let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
-    forM_ (map resolve solution) $ \(w1, w2) -> printf "> %s %s\n" w1 w2
+
+    mapM_ (print . resolve) cmds
