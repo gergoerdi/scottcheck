@@ -65,12 +65,11 @@ main = do
     cmds <- runSMTWith z3{ verbose = True} $ do
         query $ loopState genInput (initState theGame) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
-            (finished, output) <- runGame theGame $ do
+            runGame theGame $ do
                 end1 <- stepWorld
-                ite (SBV.isJust end1) (return $ SBV.fromJust end1) $ do
+                ite end1 (return end1) $ do
                     end2 <- stepPlayer (verb, noun)
-                    ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
-            return finished
+                    return end2
 
     let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
 

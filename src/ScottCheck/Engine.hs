@@ -35,118 +35,63 @@ type SInput = (SInt16, SInt16)
 
 data S = S
     { _currentRoom :: SInt16
-    , _needLook :: SBool
     , _itemLocations :: Array Int16 SInt16
-    , _dead :: SBool
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
-type Engine = ReaderT Game (WriterT [SString] (State S))
-
-dirNames :: [String]
-dirNames = ["North", "South", "East", "West", "Up", "Down"]
+type Engine = ReaderT Game (State S)
 
 carried :: Int16
 carried = 255
 
-say :: SString -> Engine ()
-say = tell . (:[])
-
 say_ :: String -> Engine ()
-say_ = say . literal
+say_ _ = return ()
 
 initState :: Game -> S
 initState game = S
     { _currentRoom = literal $ gameStartRoom game
-    , _needLook = sTrue
     , _itemLocations = fmap (\(Item _ _ _ loc) -> literal loc) $ gameItems game
-    , _dead = sFalse
     }
 
-runGame :: Game -> Engine a -> State S (a, [SString])
-runGame game act = runWriterT $ runReaderT act game
+runGame :: Game -> Engine a -> State S a
+runGame game act = runReaderT act game
 
-stepWorld :: Engine (SMaybe Bool)
+stepWorld :: Engine SBool
 stepWorld = do
     perform (0, 0)
-    look
     finished
 
-stepPlayer :: SInput -> Engine (SMaybe Bool)
+stepPlayer :: SInput -> Engine SBool
 stepPlayer (v, n) = do
     perform (v, n)
     finished
 
-data SRoom = SRoom [SInt16] SString deriving (Show, Generic, Mergeable)
+data SRoom = SRoom [SInt16] deriving (Show, Generic, Mergeable)
 
 sRoom :: Room -> SRoom
-sRoom (Room exits desc) = SRoom (map literal exits) (literal desc)
+sRoom (Room exits desc) = SRoom (map literal exits)
 
-look :: Engine ()
-look = do
-    here <- use currentRoom
-    SRoom exits desc <- asks $ (.! here) . fmap sRoom . gameRooms
-    say desc
-
-    itemLocs <- use itemLocations
-    items <- asks gameItems
-    let itemLocs' = [ (loc, desc) | (Item _ _ desc _, loc) <- zip (A.elems items) (A.elems itemLocs) ]
-        anyHere = sAny ((.== here) . fst) itemLocs'
-    sWhen anyHere $ do
-        say_ "I can also see:"
-        forM_ itemLocs' $ \(loc, desc) -> sWhen (loc .== here) $ say $ literal $ " * " <> desc
-
-score :: Engine SInt16
-score = do
-    treasury <- asks gameTreasury
-    items <- asks gameItems
-    itemLocations <- use itemLocations
-    let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
-    return $ count (.== literal treasury) treasureLocs
-
-die :: Engine ()
-die = dead .= sTrue
-
-finished :: Engine (SMaybe Bool)
+finished :: Engine SBool
 finished = do
-    dead <- use dead
-
     maxScore <- asks gameMaxScore
     treasury <- asks gameTreasury
     items <- asks gameItems
     itemLocations <- use itemLocations
     let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
-    let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
+    let haveAllTreasure = map (.== literal treasury) treasureLocs `pbExactly` fromIntegral maxScore
 
-    return $ ite dead (sJust sFalse) $
-      ite haveAllTreasure (sJust sTrue) $
-      sNothing
-
-parseInput :: Game -> String -> String -> Maybe Input
-parseInput Game{..} w1 w2 = case (verb, noun) of
-    (Nothing, Just (-1)) | Just dir <- parse gameNouns w1, 1 <= dir && dir <= 6 -> Just (1, dir)
-    (Just verb, Just noun) -> Just (verb, noun)
-    _ -> Nothing
-  where
-    verb = parse gameVerbs w1
-    noun = parse gameNouns w2
-
-    parse dict "" = Just (-1)
-    parse dict s = M.lookup (normalize s) dict
-
-    normalize = map toUpper . take (fromIntegral gameWordLength)
+    return haveAllTreasure
 
 builtin :: SInput -> Engine SBool
 builtin (verb, noun) = sCase verb (return sFalse)
     [ (1, builtin_go)
     , (10, builtin_get)
-    , (18, builtin_drop)
     ]
   where
     builtin_go = ite (sNot $ 1 .<= noun .&& noun .<= 6) badDir $ do
         let dir = noun - 1
         here <- use currentRoom
-        SRoom exits _ <- asks $ (.! here) . fmap sRoom . gameRooms
+        SRoom exits <- asks $ (.! here) . fmap sRoom . gameRooms
         let newRoom = select exits 0 dir
         ite (newRoom .== 0) blocked $ do
             currentRoom .= newRoom
@@ -156,7 +101,7 @@ builtin (verb, noun) = sCase verb (return sFalse)
             say_ "I don't know how to go in that direction"
             return sTrue
 
-        blocked = say_ "I can't go in that direction."
+        blocked = return ()
 
     builtin_get = do
         locs <- use itemLocations
@@ -165,16 +110,6 @@ builtin (verb, noun) = sCase verb (return sFalse)
         let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
         ite (select (A.elems locs) (-1) item ./= here) (say_ "It's beyond my power to do that.") $ do
             move item (literal carried)
-            say_ "OK."
-        return sTrue
-
-    builtin_drop = do
-        locs <- use itemLocations
-        here <- use currentRoom
-        items <- asks gameItems
-        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
-        ite (select (A.elems locs) (-1) item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
-            move item here
             say_ "OK."
         return sTrue
 
