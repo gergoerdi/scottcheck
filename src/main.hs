@@ -62,7 +62,7 @@ main = do
             noun <- genWord "noun" i
             return $ SBV.tuple (verb, noun)
 
-    cmds <- runSMTWith z3{ verbose = True} $ do
+    cmds <- runSMT $ do
         query $ loopState genInput (initState theGame) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
             (finished, output) <- runGame theGame $ do
