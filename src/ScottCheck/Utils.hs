@@ -41,7 +41,7 @@ sFindIndex p = go 0
     go i (x:xs) = ite (p x) (sJust i) (go (i + 1) xs)
 
 
-loopState :: (SMTValue i) => (Int -> Query (SBV i)) -> s -> (SBV i -> State s SBool) -> Query [i]
+loopState :: (SymVal i) => (Int -> Query (SBV i)) -> s -> (SBV i -> State s SBool) -> Query [i]
 loopState genCmd s0 step = go 1 s0 []
   where
     go i s cmds = do

@@ -5,12 +5,16 @@
 
 packages:
 - completed:
-    hackage: sbv-8.6@sha256:1bcd7a8851157a97e44a000498f984fb738e54441f16e8c2e2afcc1d0818e888,19781
+    name: sbv
+    version: 8.7.5
+    git: https://github.com/LeventErkok/sbv.git
     pantry-tree:
-      size: 54568
-      sha256: ee73d9d941f7d41d21409927a058aed6bb473f3ae4383ef51bd021b80c120bc5
+      size: 61875
+      sha256: c33fa4b43fb6397e06903a7efa4b6d104a179cbec26418e687bd7a3d90d0e22d
+    commit: 9d71991feb0ef424d7108a0e9f0bc9ebe31aabce
   original:
-    hackage: sbv-8.6
+    git: https://github.com/LeventErkok/sbv.git
+    commit: 9d71991feb0ef424d7108a0e9f0bc9ebe31aabce
 snapshots:
 - completed:
     size: 531696
