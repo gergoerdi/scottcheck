@@ -47,7 +47,7 @@ main :: IO ()
 main = do
     Options{..} <- execParser optionsInfo
 
-    -- hSetBuffering stdout NoBuffering
+    hSetBuffering stdout NoBuffering
 
     s <- T.readFile filePath
     let Right theGame = parseOnly game s
