@@ -63,7 +63,8 @@ main = do
             return $ SBV.tuple (verb, noun)
 
     cmds <- runSMT $ do
-        query $ loopState genInput (initState theGame) $ \cmd -> do
+        arr <- newArray "items" Nothing
+        query $ loopState genInput (initState theGame arr) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
             (finished, output) <- runGame theGame $ do
                 end1 <- stepWorld
