@@ -36,7 +36,7 @@ type SInput = (SInt16, SInt16)
 data S = S
     { _currentRoom :: SInt16
     , _needLook :: SBool
-    , _itemLocations :: Array Int16 SInt16
+    , _itemLocations :: SArray Int16 Int16
     , _dead :: SBool
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
@@ -55,11 +55,16 @@ say = tell . (:[])
 say_ :: String -> Engine ()
 say_ = say . literal
 
-initState :: Game -> S
-initState game = S
+fillArray :: (Ix a, SymArray sarr, SymVal a, SymVal b) => Array a b -> sarr a b -> sarr a b
+fillArray arr sarr = foldr write sarr (A.assocs arr)
+  where
+    write (i, x) sarr = writeArray sarr (literal i) (literal x)
+
+initState :: Game -> SArray Int16 Int16 -> S
+initState game itemsArr = S
     { _currentRoom = literal $ gameStartRoom game
     , _needLook = sTrue
-    , _itemLocations = fmap (\(Item _ _ _ loc) -> literal loc) $ gameItems game
+    , _itemLocations = fillArray (fmap (\(Item _ _ _ loc) -> loc) $ gameItems game) itemsArr
     , _dead = sFalse
     }
 
@@ -90,7 +95,7 @@ look = do
 
     itemLocs <- use itemLocations
     items <- asks gameItems
-    let itemLocs' = [ (loc, desc) | (Item _ _ desc _, loc) <- zip (A.elems items) (A.elems itemLocs) ]
+    let itemLocs' = [ (readArray itemLocs (literal item), desc) | (item, Item _ _ desc _) <- A.assocs items ]
         anyHere = sAny ((.== here) . fst) itemLocs'
     sWhen anyHere $ do
         say_ "I can also see:"
@@ -100,8 +105,8 @@ score :: Engine SInt16
 score = do
     treasury <- asks gameTreasury
     items <- asks gameItems
-    itemLocations <- use itemLocations
-    let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
+    itemLocs <- use itemLocations
+    let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _ _) <- A.assocs items ]
     return $ count (.== literal treasury) treasureLocs
 
 die :: Engine ()
@@ -114,8 +119,8 @@ finished = do
     maxScore <- asks gameMaxScore
     treasury <- asks gameTreasury
     items <- asks gameItems
-    itemLocations <- use itemLocations
-    let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
+    itemLocs <- use itemLocations
+    let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _ _) <- A.assocs items ]
     let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
 
     return $ ite dead (sJust sFalse) $
@@ -161,9 +166,8 @@ builtin (verb, noun) = sCase verb (return sFalse)
     builtin_get = do
         locs <- use itemLocations
         here <- use currentRoom
-        items <- asks gameItems
-        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
-        ite (select (A.elems locs) (-1) item ./= here) (say_ "It's beyond my power to do that.") $ do
+        item <- parseItem
+        ite (readArray locs item ./= here) (say_ "It's beyond my power to do that.") $ do
             move item (literal carried)
             say_ "OK."
         return sTrue
@@ -171,12 +175,16 @@ builtin (verb, noun) = sCase verb (return sFalse)
     builtin_drop = do
         locs <- use itemLocations
         here <- use currentRoom
-        items <- asks gameItems
-        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
-        ite (select (A.elems locs) (-1) item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
+        item <- parseItem
+        ite (readArray locs item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
             move item here
             say_ "OK."
         return sTrue
+
+    parseItem = do
+        items <- asks gameItems
+        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+
 
 perform :: SInput -> Engine ()
 perform (verb, noun) = do
@@ -220,11 +228,11 @@ evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
       ]
   where
     isItemAt room = do
-        loc <- uses itemLocations (.! dat)
+        loc <- uses itemLocations (`readArray` dat)
         return $ loc .== room
 
     itemAvailable = do
-        loc <- uses itemLocations (.! dat)
+        loc <- uses itemLocations (`readArray` dat)
         here <- use currentRoom
         return $ loc .== literal carried .|| loc .== here
 
@@ -278,10 +286,10 @@ execInstr instr =
         item1 <- nextArg
         item2 <- nextArg
         lift $ do
-            loc1 <- uses itemLocations (.! item1)
-            loc2 <- uses itemLocations (.! item2)
+            loc1 <- uses itemLocations (`readArray` item1)
+            loc2 <- uses itemLocations (`readArray` item2)
             move item1 loc2
             move item2 loc1
 
 move :: SInt16 -> SInt16 -> Engine ()
-move item loc = itemLocations %= replaceAt item loc
+move item loc = itemLocations %= \arr -> writeArray arr item loc
