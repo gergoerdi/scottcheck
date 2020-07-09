@@ -36,7 +36,7 @@ type SInput = (SInt16, SInt16)
 data S = S
     { _currentRoom :: SInt16
     , _needLook :: SBool
-    , _itemLocations :: SArray Int16 Int16
+    , _itemLocations :: SFunArray Int16 Int16
     , _dead :: SBool
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
@@ -60,7 +60,7 @@ fillArray arr sarr = foldr write sarr (A.assocs arr)
   where
     write (i, x) sarr = writeArray sarr (literal i) (literal x)
 
-initState :: Game -> SArray Int16 Int16 -> S
+initState :: Game -> SFunArray Int16 Int16 -> S
 initState game itemsArr = S
     { _currentRoom = literal $ gameStartRoom game
     , _needLook = sTrue
