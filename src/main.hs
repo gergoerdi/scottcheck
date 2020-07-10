@@ -25,6 +25,8 @@ import Data.Either
 import Data.Array
 import Options.Applicative
 import Control.Monad
+import Control.Monad.State
+import Control.Monad.IO.Class
 
 data Options = Options
     { filePath :: FilePath
@@ -53,25 +55,19 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    let genWord name i = do
-            word <- freshVar $ printf "%s@%d" name (i :: Int)
-            constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
-            return word
-        genInput i = do
-            verb <- genWord "verb" i
-            noun <- genWord "noun" i
-            return $ SBV.tuple (verb, noun)
+    runSMT $ do
+        s <- return $ initState theGame
+        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
+        (finished, output) <- query $ do
+            ensureSat
+            (,) <$> getValue finished <*> mapM getValue output
+        liftIO $ mapM_ putStrLn output
+        liftIO $ print finished
 
-    cmds <- runSMT $ do
-        query $ loopState genInput (initState theGame) $ \cmd -> do
-            let (verb, noun) = SBV.untuple cmd
-            (finished, output) <- runGame theGame $ do
-                end1 <- stepWorld
-                ite (SBV.isJust end1) (return $ SBV.fromJust end1) $ do
-                    end2 <- stepPlayer (verb, noun)
-                    ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
-            return finished
-
-    let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
-
-    mapM_ (print . resolve) cmds
+        let Just (verb, noun) = parseInput theGame "GO" "SOUTH"
+        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
+        (finished, output) <- query $ do
+            ensureSat
+            (,) <$> getValue finished <*> mapM getValue output
+        liftIO $ mapM_ putStrLn output
+        liftIO $ print finished
