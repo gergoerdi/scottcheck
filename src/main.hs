@@ -94,25 +94,28 @@ play theGame = runSMT $ query $ go $ initState theGame
 
     go s = round s >>= go
 
+    io s act = do
+        ((finished, output), s') <- return $ flip runState s $ runGame theGame act
+
+        ensureSat
+        finished <- getValue finished
+        output <- mapM getValue output
+        liftIO $ mapM_ putStrLn output
+        case finished of
+            Just won -> finishWith won
+            Nothing -> return s'
+
     round s = do
-        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
-
-        ensureSat
-        finished <- getValue finished
-        output <- mapM getValue output
-        liftIO $ mapM_ putStrLn output
-        -- TODO: finished?
-
+        s <- io s stepWorld
         (verb, noun) <- liftIO input
-        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
-
-        ensureSat
-        finished <- getValue finished
-        output <- mapM getValue output
-        liftIO $ mapM_ putStrLn output
-        -- TODO: finished?
-
+        s <- io s $ stepPlayer (literal verb, literal noun)
         return s
+
+    finishWith won = liftIO $ do
+        putStrLn msg
+        exitSuccess
+      where
+        msg = if won then "You have won!" else "You have died."
 
 main :: IO ()
 main = do
