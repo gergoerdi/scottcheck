@@ -45,6 +45,16 @@ optionsInfo = info (options <**> helper) $ mconcat
     , progDesc "SMT based verification of Scott Adams adventure games"
     ]
 
+input :: Game -> IO (Int16, Int16)
+input theGame = do
+    putStr "> "
+    line <- getLine
+    let (w1, w2) = case words line of
+            (w1:w2:_) -> (w1, w2)
+            [w1] -> (w1, "")
+            [] -> ("", "")
+    maybe (putStrLn "I didn't get that." >> input theGame) return $ parseInput theGame w1 w2
+
 main :: IO ()
 main = do
     Options{..} <- execParser optionsInfo
@@ -55,19 +65,27 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    runSMT $ do
-        s <- return $ initState theGame
-        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
-        (finished, output) <- query $ do
-            ensureSat
-            (,) <$> getValue finished <*> mapM getValue output
-        liftIO $ mapM_ putStrLn output
-        liftIO $ print finished
+    runSMT $ query $ do
+        let round s = do
+                ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
 
-        let Just (verb, noun) = parseInput theGame "GO" "SOUTH"
-        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
-        (finished, output) <- query $ do
-            ensureSat
-            (,) <$> getValue finished <*> mapM getValue output
-        liftIO $ mapM_ putStrLn output
-        liftIO $ print finished
+                ensureSat
+                finished <- getValue finished
+                output <- mapM getValue output
+                liftIO $ mapM_ putStrLn output
+                -- TODO: finished?
+
+                (verb, noun) <- liftIO $ input theGame
+                ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
+
+                ensureSat
+                finished <- getValue finished
+                output <- mapM getValue output
+                liftIO $ mapM_ putStrLn output
+                -- TODO: finished?
+
+                return s
+
+        let loop s = do
+                round s >>= loop
+        loop $ initState theGame
