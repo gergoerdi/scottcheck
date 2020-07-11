@@ -12,7 +12,7 @@ import ScottCheck.Engine
 import ScottCheck.Utils
 
 import qualified Data.Map as M
-import Data.SBV hiding (options)
+import Data.SBV hiding (options, solve)
 import Data.SBV.Control
 import Data.SBV.Internals (SMTModel(..), CV(..), CVal(..))
 import qualified Data.SBV.Maybe as SBV
@@ -28,12 +28,23 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.IO.Class
 
+data Mode
+    = Solve
+    | Play
+    deriving (Show, Read, Enum, Bounded)
+
 data Options = Options
     { filePath :: FilePath
+    , mode :: Mode
     }
 
 options :: Parser Options
 options = do
+    mode <- flag Solve Play $ mconcat
+        [ long "interactive"
+        , short 'i'
+        , help "Interactive mode"
+        ]
     filePath <- strArgument $ mconcat
         [ metavar "FILENAME"
         ]
@@ -45,15 +56,63 @@ optionsInfo = info (options <**> helper) $ mconcat
     , progDesc "SMT based verification of Scott Adams adventure games"
     ]
 
-input :: Game -> IO (Int16, Int16)
-input theGame = do
-    putStr "> "
-    line <- getLine
-    let (w1, w2) = case words line of
-            (w1:w2:_) -> (w1, w2)
-            [w1] -> (w1, "")
-            [] -> ("", "")
-    maybe (putStrLn "I didn't get that." >> input theGame) return $ parseInput theGame w1 w2
+solve :: Game -> IO ()
+solve theGame = do
+    let genWord name i = do
+            word <- freshVar $ printf "%s@%d" name (i :: Int)
+            constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
+            return word
+        genInput i = do
+            verb <- genWord "verb" i
+            noun <- genWord "noun" i
+            return $ SBV.tuple (verb, noun)
+    cmds <- runSMT $ do
+        query $ loopState genInput (initState theGame) $ \cmd -> do
+            let (verb, noun) = SBV.untuple cmd
+            (finished, output) <- runGame theGame $ do
+                end1 <- stepWorld
+                ite (SBV.isJust end1) (return $ SBV.fromJust end1) $ do
+                    end2 <- stepPlayer (verb, noun)
+                    ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
+            return finished
+
+    let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
+
+    mapM_ (print . resolve) cmds
+
+play :: Game -> IO ()
+play theGame = runSMT $ query $ go $ initState theGame
+  where
+    input = do
+        putStr "> "
+        line <- getLine
+        let (w1, w2) = case words line of
+                (w1:w2:_) -> (w1, w2)
+                [w1] -> (w1, "")
+                [] -> ("", "")
+        maybe (putStrLn "I didn't get that." >> input) return $ parseInput theGame w1 w2
+
+    go s = round s >>= go
+
+    round s = do
+        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
+
+        ensureSat
+        finished <- getValue finished
+        output <- mapM getValue output
+        liftIO $ mapM_ putStrLn output
+        -- TODO: finished?
+
+        (verb, noun) <- liftIO input
+        ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
+
+        ensureSat
+        finished <- getValue finished
+        output <- mapM getValue output
+        liftIO $ mapM_ putStrLn output
+        -- TODO: finished?
+
+        return s
 
 main :: IO ()
 main = do
@@ -65,27 +124,6 @@ main = do
     let Right theGame = parseOnly game s
     -- print theGame
 
-    runSMT $ query $ do
-        let round s = do
-                ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepWorld
-
-                ensureSat
-                finished <- getValue finished
-                output <- mapM getValue output
-                liftIO $ mapM_ putStrLn output
-                -- TODO: finished?
-
-                (verb, noun) <- liftIO $ input theGame
-                ((finished, output), s) <- return $ flip runState s $ runGame theGame $ stepPlayer (literal verb, literal noun)
-
-                ensureSat
-                finished <- getValue finished
-                output <- mapM getValue output
-                liftIO $ mapM_ putStrLn output
-                -- TODO: finished?
-
-                return s
-
-        let loop s = do
-                round s >>= loop
-        loop $ initState theGame
+    case mode of
+        Solve -> solve theGame
+        Play -> play theGame
