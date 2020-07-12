@@ -4,11 +4,10 @@ import ScottCheck.Engine
 
 import Data.SBV hiding (options, solve)
 import Data.SBV.Control
-import qualified Data.Array as A
 
 main :: IO ()
 main = do
-    let theGame = A.listArray (0,0) [ Item (Just 7) 255 ]
+    let theGame = [Just 7]
     cmds <- runSMT $ do
         arr <- newArray "items" Nothing
         query $ do
