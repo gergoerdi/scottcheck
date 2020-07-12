@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
-module ScottCheck.Engine (Game(..), Room(..), Item(..), initState, runGame, stepWorld, stepPlayer) where
+module ScottCheck.Engine (Game(..), Room(..), Item(..), initState, runGame, stepPlayer) where
 
 import ScottCheck.Utils
 
@@ -16,7 +16,6 @@ import Data.Array as A
 
 import GHC.Generics (Generic)
 import Data.SBV
-import Data.SBV.Maybe (sNothing, sJust)
 import qualified Data.SBV.Maybe as SBV
 
 data Game = Game
@@ -39,7 +38,6 @@ type SInput = (SInt16, SInt16)
 data S = S
     { _currentRoom :: SInt16
     , _itemLocations :: SFunArray Int16 Int16
-    , _dead :: SBool
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
@@ -57,18 +55,12 @@ initState :: Game -> SFunArray Int16 Int16 -> S
 initState game itemsArr = S
     { _currentRoom = literal $ gameStartRoom game
     , _itemLocations = fillArray (fmap (\(Item _ _ _ loc) -> loc) $ gameItems game) itemsArr
-    , _dead = sFalse
     }
 
 runGame :: Game -> Engine a -> State S (a, [SString])
 runGame game act = runWriterT $ runReaderT act game
 
-stepWorld :: Engine (SMaybe Bool)
-stepWorld = do
-    perform (0, 0)
-    finished
-
-stepPlayer :: SInput -> Engine (SMaybe Bool)
+stepPlayer :: SInput -> Engine SBool
 stepPlayer (v, n) = do
     perform (v, n)
     finished
@@ -78,10 +70,8 @@ data SRoom = SRoom [SInt16] SString deriving (Show, Generic, Mergeable)
 sRoom :: Room -> SRoom
 sRoom (Room exits desc) = SRoom (map literal exits) (literal desc)
 
-finished :: Engine (SMaybe Bool)
+finished :: Engine SBool
 finished = do
-    dead <- use dead
-
     maxScore <- asks gameMaxScore
     treasury <- asks gameTreasury
     items <- asks gameItems
@@ -89,11 +79,7 @@ finished = do
     let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _ _) <- A.assocs items ]
     let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
 
-    return $ ite dead (sJust sFalse) $
-      ite haveAllTreasure (sJust sTrue) $
-      sNothing
-
--- sWhen b act = ite b (return ()) act
+    return haveAllTreasure
 
 builtin :: SInput -> Engine ()
 builtin (verb, noun) = sCase verb (return ())

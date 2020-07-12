@@ -6,7 +6,6 @@ import ScottCheck.Utils (loopState)
 
 import Data.SBV hiding (options, solve)
 import Data.SBV.Control
-import qualified Data.SBV.Maybe as SBV
 import qualified Data.SBV.Tuple as SBV
 import qualified Data.Array as A
 
@@ -16,11 +15,7 @@ solve theGame = do
         arr <- newArray "items" Nothing
         query $ loopState genInput (initState theGame arr) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
-            (finished, output) <- runGame theGame $ do
-                end1 <- stepWorld
-                ite (SBV.isJust end1) (return $ SBV.fromJust end1) $ do
-                    end2 <- stepPlayer (verb, noun)
-                    ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
+            (finished, output) <- runGame theGame $ stepPlayer (verb, noun)
             return finished
 
     mapM_ print cmds
