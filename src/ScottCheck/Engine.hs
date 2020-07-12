@@ -127,20 +127,6 @@ finished = do
       ite haveAllTreasure (sJust sTrue) $
       sNothing
 
-parseInput :: Game -> String -> String -> Maybe Input
-parseInput Game{..} w1 w2 = case (verb, noun) of
-    (Nothing, Just (-1)) | Just dir <- parse gameNouns w1, 1 <= dir && dir <= 6 -> Just (1, dir)
-    (Just verb, Just noun) -> Just (verb, noun)
-    _ -> Nothing
-  where
-    verb = parse gameVerbs w1
-    noun = parse gameNouns w2
-
-    parse dict "" = Just (-1)
-    parse dict s = M.lookup (normalize s) dict
-
-    normalize = map toUpper . take (fromIntegral gameWordLength)
-
 builtin :: SInput -> Engine SBool
 builtin (verb, noun) = sCase verb (return sFalse)
     [ (1, builtin_go)
