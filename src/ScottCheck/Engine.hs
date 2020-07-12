@@ -18,8 +18,8 @@ carried = 255
 initState :: SArr Int16 Int16 -> S
 initState itemsArr = writeArray itemsArr 0 255
 
-step :: Array Int16 Item -> (SInt16, SInt16) -> S -> (SBool, S)
-step items (verb, noun) locs = (finished, locs')
+step :: Array Int16 Item -> (SInt16, SInt16) -> S -> SBool
+step items (verb, noun) locs = finished
   where
     finished = readArray locs' (literal 0) .== 1
 

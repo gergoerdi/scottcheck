@@ -16,9 +16,7 @@ main = do
 
             verb1 <- genWord
             noun1 <- genWord
-            push 1
-            (finished, s) <- return $ step theGame (verb1, noun1) s
-            constrain finished
+            constrain $ step theGame (verb1, noun1) s
             ensureSat
 
             mapM getValue [verb1, noun1]
