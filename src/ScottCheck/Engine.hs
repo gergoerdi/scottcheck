@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-module ScottCheck.Engine (Game(..), Item(..), initState, stepPlayer) where
+module ScottCheck.Engine (Game(..), Item(..), initState, step) where
 
 import Data.Int
 import Data.Array as A
@@ -31,17 +31,11 @@ carried = 255
 initState :: Game -> SArr Int16 Int16 -> S
 initState Game{..} itemsArr = (literal gameStartRoom, writeArray itemsArr 0 255)
 
-stepPlayer :: Game -> SInput -> S -> (SBool, S)
-stepPlayer game@Game{..} (verb, noun) s@(here, locs) = -- (finished, s')
-    let s' = builtin game (verb, noun) s
-    in (finished game s', s')
-
-finished :: Game -> S -> SBool
-finished Game{..} (_, itemLocs) = readArray itemLocs (literal 0) .== literal gameTreasury
-
-builtin :: Game -> SInput -> S -> S
-builtin Game{..} (verb, noun) s@(here, locs) = (here, locs')
+step :: Game -> SInput -> S -> (SBool, S)
+step Game{..} (verb, noun) s@(here, locs) = (finished, (here, locs'))
   where
+    finished = readArray locs' (literal 0) .== literal gameTreasury
+
     locs' = ite (verb .== 10) builtin_get $
             ite (verb .== 18) builtin_drop $
             locs
