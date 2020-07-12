@@ -4,17 +4,10 @@ category: game
 
 dependencies:
   - base
-  - parsers
-  - text
-  - attoparsec
   - mtl
   - transformers
-  - lens
-  - monad-loops
-  - containers
   - array
   - sbv
-  - optparse-applicative
 
 source-dirs:
   - src

@@ -8,11 +8,9 @@ import ScottCheck.Utils
 import Control.Monad.State
 import Data.SBV.MTL ()
 
-import Control.Lens
 import Data.Int
 import Data.Array as A
 
-import GHC.Generics (Generic)
 import Data.SBV
 import qualified Data.SBV.Maybe as SBV
 
@@ -30,11 +28,9 @@ data Item = Item Bool (Maybe Int16) Int16 deriving (Show)
 
 type SInput = (SInt16, SInt16)
 
-data S = S
-    { _currentRoom :: SInt16
-    , _itemLocations :: SFunArray Int16 Int16
-    } deriving (Show, Generic, Mergeable)
-makeLenses ''S
+type SArr = SFunArray
+
+type S = (SInt16, SArr Int16 Int16)
 
 carried :: Int16
 carried = 255
@@ -44,11 +40,8 @@ fillArray arr sarr = foldr write sarr (A.assocs arr)
   where
     write (i, x) sarr = writeArray sarr (literal i) (literal x)
 
-initState :: Game -> SFunArray Int16 Int16 -> S
-initState game itemsArr = S
-    { _currentRoom = literal $ gameStartRoom game
-    , _itemLocations = fillArray (fmap (\(Item _ _ loc) -> loc) $ gameItems game) itemsArr
-    }
+initState :: Game -> SArr Int16 Int16 -> S
+initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ _ loc) -> loc) gameItems) itemsArr)
 
 stepPlayer :: Game -> SInput -> State S SBool
 stepPlayer game (verb, noun) = do
@@ -57,7 +50,7 @@ stepPlayer game (verb, noun) = do
 
 finished :: Game -> State S SBool
 finished Game{..} = do
-    itemLocs <- use itemLocations
+    (_, itemLocs) <- get
     return $ readArray itemLocs (literal 0) .== literal gameTreasury
 
 builtin :: Game -> SInput -> State S ()
@@ -69,20 +62,18 @@ builtin Game{..} (verb, noun) = sCase verb (return ())
   where
     builtin_go = sWhen (1 .<= noun .&& noun .<= 6) $ do
         let dir = noun - 1
-        here <- use currentRoom
+        (here, locs) <- get
         let exits = (map literal <$> gameRooms) .! here
         let newRoom = select exits 0 dir
-        sWhen (newRoom ./= 0) $ currentRoom .= newRoom
+        sWhen (newRoom ./= 0) $ put (newRoom, locs)
 
     builtin_get = do
-        locs <- use itemLocations
-        here <- use currentRoom
+        (here, locs) <- get
         item <- parseItem
         sWhen (readArray locs item .== here) $ move item (literal carried)
 
     builtin_drop = do
-        locs <- use itemLocations
-        here <- use currentRoom
+        (here, locs) <- get
         item <- parseItem
         sWhen (readArray locs item .== literal carried) $ move item here
 
@@ -91,4 +82,4 @@ builtin Game{..} (verb, noun) = sCase verb (return ())
 
 
 move :: SInt16 -> SInt16 -> State S ()
-move item loc = itemLocations %= \arr -> writeArray arr item loc
+move item loc = modify $ \(here, locs) -> (here, writeArray locs item loc)
