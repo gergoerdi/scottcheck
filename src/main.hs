@@ -7,12 +7,13 @@ import Data.SBV.Control
 import qualified Data.Array as A
 import Control.Monad.IO.Class
 
-solve :: Game -> IO ()
-solve theGame = do
+main :: IO ()
+main = do
+    let theGame = A.listArray (0,0) [ Item (Just 7) 255 ]
     cmds <- runSMT $ do
         arr <- newArray "items" Nothing
         query $ do
-            s <- return $ initState theGame arr
+            s <- return $ initState arr
 
             verb1 <- genWord
             noun1 <- genWord
@@ -36,18 +37,5 @@ solve theGame = do
   where
     genWord = do
         word <- freshVar_
-        constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
+        constrain $ 0 .<= word .&& word .< literal 19
         return word
-
-main :: IO ()
-main = do
-    let theGame = Game
-            { gameStartRoom = 1
-            , gameTreasury = 1
-            , gameDictSize = 19
-            , gameItems = A.listArray (0,0)
-                  [ Item (Just 7) 255
-                  ]
-            }
-
-    solve theGame
