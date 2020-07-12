@@ -35,8 +35,15 @@ main = do
             , gameTreasury = 2
             , gameMaxScore = 1
             , gameDictSize = 19
-            , gameItems = A.array (0,1) [(0,Item False Nothing "Sign says: leave treasure here, then say SCORE" 2),(1,Item True (Just 7) "*Gold coin*" 3)]
-            , gameRooms = A.array (0,3) [(0,Room [0,0,0,0,0,0] ""),(1,Room [0,2,0,0,0,0] "gorgeously decorated throne room"),(2,Room [1,3,0,0,0,0] "N-S corridor"),(3,Room [2,0,0,0,0,0] "square chamber")]
+            , gameItems = A.listArray (0,0)
+                  [ Item True (Just 7) 3
+                  ]
+            , gameRooms = A.listArray (0,3)
+                  [ Room [0,0,0,0,0,0]
+                  , Room [0,2,0,0,0,0]
+                  , Room [1,3,0,0,0,0]
+                  , Room [2,0,0,0,0,0]
+                  ]
             }
 
     solve theGame

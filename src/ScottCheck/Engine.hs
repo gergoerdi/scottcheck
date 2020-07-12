@@ -27,9 +27,9 @@ data Game = Game
     }
     deriving (Show)
 
-data Room = Room [Int16] String deriving (Show)
+data Room = Room [Int16] deriving (Show)
 
-data Item = Item Bool (Maybe Int16) String Int16 deriving (Show)
+data Item = Item Bool (Maybe Int16) Int16 deriving (Show)
 
 
 type SInput = (SInt16, SInt16)
@@ -53,7 +53,7 @@ fillArray arr sarr = foldr write sarr (A.assocs arr)
 initState :: Game -> SFunArray Int16 Int16 -> S
 initState game itemsArr = S
     { _currentRoom = literal $ gameStartRoom game
-    , _itemLocations = fillArray (fmap (\(Item _ _ _ loc) -> loc) $ gameItems game) itemsArr
+    , _itemLocations = fillArray (fmap (\(Item _ _ loc) -> loc) $ gameItems game) itemsArr
     }
 
 runGame :: Game -> Engine a -> State S a
@@ -64,10 +64,10 @@ stepPlayer (v, n) = do
     perform (v, n)
     finished
 
-data SRoom = SRoom [SInt16] SString deriving (Show, Generic, Mergeable)
+data SRoom = SRoom [SInt16] deriving (Show, Generic, Mergeable)
 
 sRoom :: Room -> SRoom
-sRoom (Room exits desc) = SRoom (map literal exits) (literal desc)
+sRoom (Room exits) = SRoom (map literal exits)
 
 finished :: Engine SBool
 finished = do
@@ -75,7 +75,7 @@ finished = do
     treasury <- asks gameTreasury
     items <- asks gameItems
     itemLocs <- use itemLocations
-    let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _ _) <- A.assocs items ]
+    let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _) <- A.assocs items ]
     let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
 
     return haveAllTreasure
@@ -90,7 +90,7 @@ builtin (verb, noun) = sCase verb (return ())
     builtin_go = sWhen (1 .<= noun .&& noun .<= 6) $ do
         let dir = noun - 1
         here <- use currentRoom
-        SRoom exits _ <- asks $ (.! here) . fmap sRoom . gameRooms
+        SRoom exits <- asks $ (.! here) . fmap sRoom . gameRooms
         let newRoom = select exits 0 dir
         sWhen (newRoom ./= 0) $ currentRoom .= newRoom
 
@@ -108,7 +108,7 @@ builtin (verb, noun) = sCase verb (return ())
 
     parseItem = do
         items <- asks gameItems
-        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
 
 
 perform :: SInput -> Engine ()
