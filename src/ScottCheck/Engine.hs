@@ -20,8 +20,7 @@ data Game = Game
     }
     deriving (Show)
 
-data Item = Item Bool (Maybe Int16) Int16 deriving (Show)
-
+data Item = Item (Maybe Int16) Int16 deriving (Show)
 
 type SInput = (SInt16, SInt16)
 
@@ -38,7 +37,7 @@ fillArray arr sarr = foldr write sarr (A.assocs arr)
     write (i, x) sarr = writeArray sarr (literal i) (literal x)
 
 initState :: Game -> SArr Int16 Int16 -> S
-initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ _ loc) -> loc) gameItems) itemsArr)
+initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ loc) -> loc) gameItems) itemsArr)
 
 stepPlayer :: Game -> SInput -> S -> (SBool, S)
 stepPlayer game (verb, noun) s =
@@ -50,18 +49,10 @@ finished Game{..} (_, itemLocs) = readArray itemLocs (literal 0) .== literal gam
 
 builtin :: Game -> SInput -> S -> S
 builtin Game{..} (verb, noun) s = sCase verb s
-    [ (1, builtin_go)
-    , (10, builtin_get)
+    [ (10, builtin_get)
     , (18, builtin_drop)
     ]
   where
-    builtin_go = ite (sNot $ 1 .<= noun .&& noun .<= 6) s $
-        let dir = noun - 1
-            (here, locs) = s
-            exits = (map literal <$> gameRooms) .! here
-            newRoom = select exits 0 dir
-        in ite (newRoom .== 0) s (newRoom, locs)
-
     builtin_get =
         let (here, locs) = s
             item = parseItem
@@ -72,7 +63,7 @@ builtin Game{..} (verb, noun) s = sCase verb s
             item = parseItem
         in ite (readArray locs item ./= literal carried) s $ move item here
 
-    parseItem = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
+    parseItem = SBV.fromMaybe (-1) $ sFindIndex (\(Item name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
 
     move :: SInt16 -> SInt16 -> S
     move item loc = let (here, locs) = s

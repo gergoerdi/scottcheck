@@ -31,16 +31,14 @@ main :: IO ()
 main = do
     let theGame = Game
             { gameStartRoom = 1
-            , gameTreasury = 2
+            , gameTreasury = 1
             , gameDictSize = 19
             , gameItems = A.listArray (0,0)
-                  [ Item True (Just 7) 3
+                  [ Item (Just 7) 255
                   ]
-            , gameRooms = A.listArray (0,3)
+            , gameRooms = A.listArray (0,1)
                   [ [0,0,0,0,0,0]
-                  , [0,2,0,0,0,0]
-                  , [1,3,0,0,0,0]
-                  , [2,0,0,0,0,0]
+                  , [0,0,0,0,0,0]
                   ]
             }
 
