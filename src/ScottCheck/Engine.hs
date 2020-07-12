@@ -16,7 +16,6 @@ data Game = Game
     , gameTreasury :: Int16
     , gameDictSize :: Int16
     , gameItems :: Array Int16 Item
-    , gameRooms :: Array Int16 [Int16]
     }
     deriving (Show)
 
@@ -31,13 +30,8 @@ type S = (SInt16, SArr Int16 Int16)
 carried :: Int16
 carried = 255
 
-fillArray :: (Ix a, SymArray sarr, SymVal a, SymVal b) => Array a b -> sarr a b -> sarr a b
-fillArray arr sarr = foldr write sarr (A.assocs arr)
-  where
-    write (i, x) sarr = writeArray sarr (literal i) (literal x)
-
 initState :: Game -> SArr Int16 Int16 -> S
-initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ loc) -> loc) gameItems) itemsArr)
+initState Game{..} itemsArr = (literal gameStartRoom, writeArray itemsArr 0 255)
 
 stepPlayer :: Game -> SInput -> S -> (SBool, S)
 stepPlayer game (verb, noun) s =

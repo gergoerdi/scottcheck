@@ -36,10 +36,6 @@ main = do
             , gameItems = A.listArray (0,0)
                   [ Item (Just 7) 255
                   ]
-            , gameRooms = A.listArray (0,1)
-                  [ [0,0,0,0,0,0]
-                  , [0,0,0,0,0,0]
-                  ]
             }
 
     solve theGame
