@@ -19,20 +19,18 @@ data Game = Game
 
 data Item = Item (Maybe Int16) Int16 deriving (Show)
 
-type SInput = (SInt16, SInt16)
-
 type SArr = SFunArray
 
-type S = (SInt16, SArr Int16 Int16)
+type S = SArr Int16 Int16
 
 carried :: Int16
 carried = 255
 
 initState :: Game -> SArr Int16 Int16 -> S
-initState Game{..} itemsArr = (literal gameStartRoom, writeArray itemsArr 0 255)
+initState Game{..} itemsArr = writeArray itemsArr 0 255
 
-step :: Game -> SInput -> S -> (SBool, S)
-step Game{..} (verb, noun) s@(here, locs) = (finished, (here, locs'))
+step :: Game -> (SInt16, SInt16) -> S -> (SBool, S)
+step Game{..} (verb, noun) locs = (finished, locs')
   where
     finished = readArray locs' (literal 0) .== literal gameTreasury
 
@@ -40,8 +38,8 @@ step Game{..} (verb, noun) s@(here, locs) = (finished, (here, locs'))
             ite (verb .== 18) builtin_drop $
             locs
 
-    builtin_get = ite (readArray locs item .== here) (writeArray locs item 255) locs
-    builtin_drop = ite (readArray locs item .== literal carried) (writeArray locs item here) locs
+    builtin_get = ite (readArray locs item .== literal gameStartRoom) (writeArray locs item 255) locs
+    builtin_drop = ite (readArray locs item .== literal carried) (writeArray locs item (literal gameStartRoom)) locs
 
     item = SBV.fromMaybe (-1) $ sFindIndex (\(Item name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
 
