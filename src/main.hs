@@ -32,7 +32,6 @@ main = do
     let theGame = Game
             { gameStartRoom = 1
             , gameTreasury = 2
-            , gameMaxScore = 1
             , gameDictSize = 19
             , gameItems = A.listArray (0,0)
                   [ Item True (Just 7) 3

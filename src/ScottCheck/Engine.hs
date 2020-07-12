@@ -19,7 +19,6 @@ import qualified Data.SBV.Maybe as SBV
 data Game = Game
     { gameStartRoom :: Int16
     , gameTreasury :: Int16
-    , gameMaxScore :: Int16
     , gameDictSize :: Int16
     , gameItems :: Array Int16 Item
     , gameRooms :: Array Int16 [Int16]
@@ -63,14 +62,9 @@ stepPlayer (v, n) = do
 
 finished :: Engine SBool
 finished = do
-    maxScore <- asks gameMaxScore
     treasury <- asks gameTreasury
-    items <- asks gameItems
     itemLocs <- use itemLocations
-    let treasureLocs = [ readArray itemLocs (literal item) | (item, Item True _ _) <- A.assocs items ]
-    let haveAllTreasure = map (.== literal treasury) treasureLocs `pbAtLeast` fromIntegral maxScore
-
-    return haveAllTreasure
+    return $ readArray itemLocs (literal 0) .== literal treasury
 
 builtin :: SInput -> Engine ()
 builtin (verb, noun) = sCase verb (return ())
