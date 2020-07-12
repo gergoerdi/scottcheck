@@ -12,13 +12,10 @@ main = do
     cmds <- runSMT $ do
         arr <- newArray "items" Nothing
         query $ do
-            s <- return $ initState arr
-
             verb1 <- genWord
             noun1 <- genWord
-            constrain $ step theGame (verb1, noun1) s
+            constrain $ step theGame (verb1, noun1) (initState arr)
             ensureSat
-
             mapM getValue [verb1, noun1]
     mapM_ print cmds
   where
