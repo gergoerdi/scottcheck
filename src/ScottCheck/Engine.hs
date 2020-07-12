@@ -5,9 +5,6 @@ module ScottCheck.Engine (Game(..), Item(..), initState, stepPlayer) where
 
 import ScottCheck.Utils
 
-import Control.Monad.State
-import Data.SBV.MTL ()
-
 import Data.Int
 import Data.Array as A
 
@@ -43,18 +40,13 @@ fillArray arr sarr = foldr write sarr (A.assocs arr)
 initState :: Game -> SArr Int16 Int16 -> S
 initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ _ loc) -> loc) gameItems) itemsArr)
 
-stepPlayer :: Game -> SInput -> State S SBool
-stepPlayer game (verb, noun) = do
-    s <- get
-    s <- return $ builtin game (verb, noun) s
-    put s
+stepPlayer :: Game -> SInput -> S -> (SBool, S)
+stepPlayer game (verb, noun) s =
+    let s' = builtin game (verb, noun) s
+    in (finished game s', s')
 
-    finished game
-
-finished :: Game -> State S SBool
-finished Game{..} = do
-    (_, itemLocs) <- get
-    return $ readArray itemLocs (literal 0) .== literal gameTreasury
+finished :: Game -> S -> SBool
+finished Game{..} (_, itemLocs) = readArray itemLocs (literal 0) .== literal gameTreasury
 
 builtin :: Game -> SInput -> S -> S
 builtin Game{..} (verb, noun) s = sCase verb s

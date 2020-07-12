@@ -4,8 +4,6 @@ category: game
 
 dependencies:
   - base
-  - mtl
-  - transformers
   - array
   - sbv
 
