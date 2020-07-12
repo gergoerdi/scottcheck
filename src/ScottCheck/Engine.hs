@@ -45,7 +45,10 @@ initState Game{..} itemsArr = (literal gameStartRoom, fillArray (fmap (\(Item _ 
 
 stepPlayer :: Game -> SInput -> State S SBool
 stepPlayer game (verb, noun) = do
-    builtin game (verb, noun)
+    s <- get
+    s <- return $ builtin game (verb, noun) s
+    put s
+
     finished game
 
 finished :: Game -> State S SBool
@@ -53,33 +56,32 @@ finished Game{..} = do
     (_, itemLocs) <- get
     return $ readArray itemLocs (literal 0) .== literal gameTreasury
 
-builtin :: Game -> SInput -> State S ()
-builtin Game{..} (verb, noun) = sCase verb (return ())
+builtin :: Game -> SInput -> S -> S
+builtin Game{..} (verb, noun) s = sCase verb s
     [ (1, builtin_go)
     , (10, builtin_get)
     , (18, builtin_drop)
     ]
   where
-    builtin_go = sWhen (1 .<= noun .&& noun .<= 6) $ do
+    builtin_go = ite (sNot $ 1 .<= noun .&& noun .<= 6) s $
         let dir = noun - 1
-        (here, locs) <- get
-        let exits = (map literal <$> gameRooms) .! here
-        let newRoom = select exits 0 dir
-        sWhen (newRoom ./= 0) $ put (newRoom, locs)
+            (here, locs) = s
+            exits = (map literal <$> gameRooms) .! here
+            newRoom = select exits 0 dir
+        in ite (newRoom .== 0) s (newRoom, locs)
 
-    builtin_get = do
-        (here, locs) <- get
-        item <- parseItem
-        sWhen (readArray locs item .== here) $ move item (literal carried)
+    builtin_get =
+        let (here, locs) = s
+            item = parseItem
+        in ite (readArray locs item ./= here) s $ move item (literal carried)
 
-    builtin_drop = do
-        (here, locs) <- get
-        item <- parseItem
-        sWhen (readArray locs item .== literal carried) $ move item here
+    builtin_drop =
+        let (here, locs) = s
+            item = parseItem
+        in ite (readArray locs item ./= literal carried) s $ move item here
 
-    parseItem = do
-        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
+    parseItem = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
 
-
-move :: SInt16 -> SInt16 -> State S ()
-move item loc = modify $ \(here, locs) -> (here, writeArray locs item loc)
+    move :: SInt16 -> SInt16 -> S
+    move item loc = let (here, locs) = s
+                    in (here, writeArray locs item loc)
