@@ -1,9 +1,8 @@
 {-# LANGUAGE RecordWildCards, TypeApplications, TupleSections, ApplicativeDo #-}
 module Main where
 
-import ScottCheck.GameData
 import ScottCheck.Engine
-import ScottCheck.Utils
+import ScottCheck.Utils (loopState)
 
 import Data.SBV hiding (options, solve)
 import Data.SBV.Control
