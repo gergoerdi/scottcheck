@@ -1,7 +1,6 @@
-{-# LANGUAGE RecordWildCards, TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-{-# LANGUAGE FlexibleContexts #-}
-module ScottCheck.Engine (Game(..), Room(..), Item(..), initState, runGame, stepPlayer) where
+module ScottCheck.Engine (Game(..), Item(..), initState, runGame, stepPlayer) where
 
 import ScottCheck.Utils
 
@@ -23,11 +22,9 @@ data Game = Game
     , gameMaxScore :: Int16
     , gameDictSize :: Int16
     , gameItems :: Array Int16 Item
-    , gameRooms :: Array Int16 Room
+    , gameRooms :: Array Int16 [Int16]
     }
     deriving (Show)
-
-data Room = Room [Int16] deriving (Show)
 
 data Item = Item Bool (Maybe Int16) Int16 deriving (Show)
 
@@ -64,11 +61,6 @@ stepPlayer (v, n) = do
     perform (v, n)
     finished
 
-data SRoom = SRoom [SInt16] deriving (Show, Generic, Mergeable)
-
-sRoom :: Room -> SRoom
-sRoom (Room exits) = SRoom (map literal exits)
-
 finished :: Engine SBool
 finished = do
     maxScore <- asks gameMaxScore
@@ -90,7 +82,7 @@ builtin (verb, noun) = sCase verb (return ())
     builtin_go = sWhen (1 .<= noun .&& noun .<= 6) $ do
         let dir = noun - 1
         here <- use currentRoom
-        SRoom exits <- asks $ (.! here) . fmap sRoom . gameRooms
+        exits <- asks $ (.! here) . fmap (map literal) . gameRooms
         let newRoom = select exits 0 dir
         sWhen (newRoom ./= 0) $ currentRoom .= newRoom
 

@@ -1,4 +1,3 @@
-{-# LANGUAGE RecordWildCards, TypeApplications, TupleSections, ApplicativeDo #-}
 module Main where
 
 import ScottCheck.Engine
@@ -39,10 +38,10 @@ main = do
                   [ Item True (Just 7) 3
                   ]
             , gameRooms = A.listArray (0,3)
-                  [ Room [0,0,0,0,0,0]
-                  , Room [0,2,0,0,0,0]
-                  , Room [1,3,0,0,0,0]
-                  , Room [2,0,0,0,0,0]
+                  [ [0,0,0,0,0,0]
+                  , [0,2,0,0,0,0]
+                  , [1,3,0,0,0,0]
+                  , [2,0,0,0,0,0]
                   ]
             }
 
