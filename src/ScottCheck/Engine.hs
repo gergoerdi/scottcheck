@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
-module ScottCheck.Engine (Game(..), Room(..), Item(..), Action(..), initState, runGame, stepWorld, stepPlayer) where
+module ScottCheck.Engine (Game(..), Room(..), Item(..), initState, runGame, stepWorld, stepPlayer) where
 
 import ScottCheck.Utils
 
@@ -25,17 +25,9 @@ data Game = Game
     , gameMaxScore :: Int16
     , gameDictSize :: Int16
     , gameItems :: Array Int16 Item
-    , gameActions :: [Action]
     , gameRooms :: Array Int16 Room
-    , gameMessages :: Array Int16 String
     }
     deriving (Show)
-
-type Input = (Int16, Int16)
-type Condition = (Int16, Int16)
-type Instr = Int16
-
-data Action = Action Input [Condition] [Instr] deriving (Show)
 
 data Room = Room [Int16] String deriving (Show)
 
