@@ -15,8 +15,7 @@ solve theGame = do
         arr <- newArray "items" Nothing
         query $ loopState genInput (initState theGame arr) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
-            (finished, output) <- runGame theGame $ stepPlayer (verb, noun)
-            return finished
+            runGame theGame $ stepPlayer (verb, noun)
 
     mapM_ print cmds
   where

@@ -6,7 +6,6 @@ module ScottCheck.Engine (Game(..), Room(..), Item(..), initState, runGame, step
 import ScottCheck.Utils
 
 import Control.Monad.Reader
-import Control.Monad.Writer
 import Control.Monad.State
 import Data.SBV.MTL ()
 
@@ -41,7 +40,7 @@ data S = S
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
-type Engine = ReaderT Game (WriterT [SString] (State S))
+type Engine = ReaderT Game (State S)
 
 carried :: Int16
 carried = 255
@@ -57,8 +56,8 @@ initState game itemsArr = S
     , _itemLocations = fillArray (fmap (\(Item _ _ _ loc) -> loc) $ gameItems game) itemsArr
     }
 
-runGame :: Game -> Engine a -> State S (a, [SString])
-runGame game act = runWriterT $ runReaderT act game
+runGame :: Game -> Engine a -> State S a
+runGame game act = runReaderT act game
 
 stepPlayer :: SInput -> Engine SBool
 stepPlayer (v, n) = do
