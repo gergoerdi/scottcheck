@@ -1,10 +1,10 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
-module ScottCheck.Engine (Game(..), Item(..), initState, runGame, stepPlayer) where
+module ScottCheck.Engine (Game(..), Item(..), initState, stepPlayer) where
 
 import ScottCheck.Utils
 
-import Control.Monad.Reader
 import Control.Monad.State
 import Data.SBV.MTL ()
 
@@ -36,8 +36,6 @@ data S = S
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
 
-type Engine = ReaderT Game (State S)
-
 carried :: Int16
 carried = 255
 
@@ -52,22 +50,18 @@ initState game itemsArr = S
     , _itemLocations = fillArray (fmap (\(Item _ _ loc) -> loc) $ gameItems game) itemsArr
     }
 
-runGame :: Game -> Engine a -> State S a
-runGame game act = runReaderT act game
+stepPlayer :: Game -> SInput -> State S SBool
+stepPlayer game (verb, noun) = do
+    builtin game (verb, noun)
+    finished game
 
-stepPlayer :: SInput -> Engine SBool
-stepPlayer (v, n) = do
-    perform (v, n)
-    finished
-
-finished :: Engine SBool
-finished = do
-    treasury <- asks gameTreasury
+finished :: Game -> State S SBool
+finished Game{..} = do
     itemLocs <- use itemLocations
-    return $ readArray itemLocs (literal 0) .== literal treasury
+    return $ readArray itemLocs (literal 0) .== literal gameTreasury
 
-builtin :: SInput -> Engine ()
-builtin (verb, noun) = sCase verb (return ())
+builtin :: Game -> SInput -> State S ()
+builtin Game{..} (verb, noun) = sCase verb (return ())
     [ (1, builtin_go)
     , (10, builtin_get)
     , (18, builtin_drop)
@@ -76,7 +70,7 @@ builtin (verb, noun) = sCase verb (return ())
     builtin_go = sWhen (1 .<= noun .&& noun .<= 6) $ do
         let dir = noun - 1
         here <- use currentRoom
-        exits <- asks $ (.! here) . fmap (map literal) . gameRooms
+        let exits = (map literal <$> gameRooms) .! here
         let newRoom = select exits 0 dir
         sWhen (newRoom ./= 0) $ currentRoom .= newRoom
 
@@ -93,14 +87,8 @@ builtin (verb, noun) = sCase verb (return ())
         sWhen (readArray locs item .== literal carried) $ move item here
 
     parseItem = do
-        items <- asks gameItems
-        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems gameItems
 
 
-perform :: SInput -> Engine ()
-perform (verb, noun) = do
-    builtin (verb, noun)
-    return ()
-
-move :: SInt16 -> SInt16 -> Engine ()
+move :: SInt16 -> SInt16 -> State S ()
 move item loc = itemLocations %= \arr -> writeArray arr item loc
