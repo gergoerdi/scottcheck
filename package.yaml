@@ -19,6 +19,9 @@ dependencies:
 source-dirs:
   - src
 
+ghc-options:
+  -Wunused-imports -Wunused-binds
+  
 executables:
   scott-check:
     main: main.hs

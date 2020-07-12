@@ -1,39 +1,18 @@
 {-# LANGUAGE RecordWildCards, TypeApplications, TupleSections, ApplicativeDo #-}
 module Main where
 
-import System.IO
-import System.Exit
-
 import ScottCheck.GameData
 import ScottCheck.Engine
 import ScottCheck.Utils
 
-import qualified Data.Map as M
 import Data.SBV hiding (options, solve)
 import Data.SBV.Control
-import Data.SBV.Internals (SMTModel(..), CV(..), CVal(..))
 import qualified Data.SBV.Maybe as SBV
 import qualified Data.SBV.Tuple as SBV
-import Debug.Trace
-import Text.Printf
-import Data.List (stripPrefix, sortBy)
-import Data.Ord (comparing)
-import Data.Either
 import qualified Data.Array as A
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.IO.Class
 
 solve :: Game -> IO ()
 solve theGame = do
-    let genWord name i = do
-            word <- freshVar $ printf "%s@%d" name (i :: Int)
-            constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
-            return word
-        genInput i = do
-            verb <- genWord "verb" i
-            noun <- genWord "noun" i
-            return $ SBV.tuple (verb, noun)
     cmds <- runSMT $ do
         arr <- newArray "items" Nothing
         query $ loopState genInput (initState theGame arr) $ \cmd -> do
@@ -46,6 +25,15 @@ solve theGame = do
             return finished
 
     mapM_ print cmds
+  where
+    genWord = do
+        word <- freshVar_
+        constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
+        return word
+    genInput i = do
+        verb <- genWord
+        noun <- genWord
+        return $ SBV.tuple (verb, noun)
 
 main :: IO ()
 main = do
