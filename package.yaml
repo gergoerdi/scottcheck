@@ -1,0 +1,22 @@
+name: ScottCheck
+version: 0.1.0
+category: game
+
+dependencies:
+  - base
+  - parsers
+  - text
+  - attoparsec
+  - mtl
+  - transformers
+  - lens
+  - containers
+  - array
+  - optparse-applicative
+
+source-dirs:
+  - src
+
+executables:
+  scott-check:
+    main: main.hs
