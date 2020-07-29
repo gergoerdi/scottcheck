@@ -137,11 +137,12 @@ parseInput Game{..} w1 w2 = case (verb, noun) of
     normalize = map toUpper . take (fromIntegral gameWordLength)
 
 builtin :: SInput -> Engine SBool
-builtin (verb, noun) = sCase verb (return sFalse)
+builtin (verb, noun) = sCase verb
     [ (1, builtin_go)
     , (10, builtin_get)
     , (18, builtin_drop)
     ]
+    (return sFalse)
   where
     builtin_go = ite (sNot $ 1 .<= noun .&& noun .<= 6) badDir $ do
         let dir = noun - 1
@@ -211,13 +212,14 @@ performMatching (verb, noun) = do
 
 evalCond :: (SInt16, SInt16) -> Engine (Either SBool SInt16)
 evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
-    sCase op (return sTrue)
+    sCase op
       [ (1, isItemAt (literal carried))
       , (2, isItemAt =<< use currentRoom)
       , (4, uses currentRoom (.== dat))
       , (6, sNot <$> isItemAt (literal carried))
       , (12, sNot <$> itemAvailable)
       ]
+      (return sTrue)
   where
     isItemAt room = do
         loc <- uses itemLocations (.! dat)
@@ -248,15 +250,16 @@ execInstr :: SInstr -> Exec SBool
 execInstr instr =
     ite (1 .<= instr .&& instr .<= 51) (msg instr) $
     ite (102 .<= instr) (msg $ instr - 50) $
-    sCase instr (return sTrue)
-    [ (0, return sTrue)
-    , (54, teleport)
-    , (63, gameOver)
-    , (64, lookAround)
-    , (65, showScore)
-    , (66, showInventory)
-    , (72, swapItems)
-    ]
+    sCase instr
+        [ (0, return sTrue)
+        , (54, teleport)
+        , (63, gameOver)
+        , (64, lookAround)
+        , (65, showScore)
+        , (66, showInventory)
+        , (72, swapItems)
+        ]
+        (return sTrue)
   where
     handler act = act *> return sTrue
 

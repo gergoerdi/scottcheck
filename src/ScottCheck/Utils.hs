@@ -28,8 +28,8 @@ count p xs = go xs
     go [] = 0
     go (x:xs) = ite (p x) 1 0 + go xs
 
-sCase :: (Mergeable a) => SInt16 -> a -> [(Int16, a)] -> a
-sCase x def = go
+sCase :: (Mergeable a) => SInt16 -> [(Int16, a)] -> a -> a
+sCase x cases def = go cases
   where
     go [] = def
     go ((k,v):kvs) = ite (x .== literal k) v (go kvs)
