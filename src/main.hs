@@ -1,32 +1,16 @@
 {-# LANGUAGE RecordWildCards, TypeApplications, TupleSections, ApplicativeDo #-}
 module Main where
 
+import ScottCheck.GameData
+import ScottCheck.Parse
+import ScottCheck.Engine
+
 import Data.Attoparsec.Text (parseOnly)
 import qualified Data.Text.IO as T
 import System.IO
 import System.Exit
-
-import ScottCheck.GameData
-import ScottCheck.Parse
--- import ScottCheck.Engine
--- import ScottCheck.Utils
-
--- import qualified Data.Map as M
--- import Data.SBV hiding (options, solve)
--- import Data.SBV.Control
--- import Data.SBV.Internals (SMTModel(..), CV(..), CVal(..))
--- import qualified Data.SBV.Maybe as SBV
--- import qualified Data.SBV.Tuple as SBV
--- import Debug.Trace
--- import Text.Printf
--- import Data.List (stripPrefix, sortBy)
--- import Data.Ord (comparing)
--- import Data.Either
--- import Data.Array
 import Options.Applicative
--- import Control.Monad
--- import Control.Monad.State
--- import Control.Monad.IO.Class
+import Control.Monad.State
 
 data Options = Options
     { filePath :: FilePath
@@ -46,7 +30,38 @@ optionsInfo = info (options <**> helper) $ mconcat
     ]
 
 play :: Game -> IO ()
-play = print
+play theGame = go $ initState theGame
+  where
+    input = do
+        putStr "> "
+        line <- getLine
+        let (w1, w2) = case words line of
+                (w1:w2:_) -> (w1, w2)
+                [w1] -> (w1, "")
+                [] -> ("", "")
+        maybe (putStrLn "I didn't get that." >> input) return $ parseInput theGame w1 w2
+
+    go s = round s >>= go
+
+    io s act = do
+        ((finished, output), s') <- return $ flip runState s $ runGame theGame act
+
+        mapM_ putStrLn output
+        case finished of
+            Just won -> finishWith won
+            Nothing -> return s'
+
+    round s = do
+        s <- io s stepWorld
+        (verb, noun) <- input
+        s <- io s $ stepPlayer (verb, noun)
+        return s
+
+    finishWith won = do
+        putStrLn msg
+        exitSuccess
+      where
+        msg = if won then "You have won!" else "You have died."
 
 main :: IO ()
 main = do

@@ -30,6 +30,7 @@ type Instr = Int16
 
 data Action = Action Input [Condition] [Instr] deriving (Show)
 
+-- TODO: make exits into an array...
 data Room = Room [Int16] String deriving (Show)
 
 data Item = Item Bool (Maybe Int16) String Int16 deriving (Show)
