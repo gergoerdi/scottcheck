@@ -12,6 +12,7 @@ dependencies:
   - lens
   - containers
   - array
+  - sbv
   - optparse-applicative
 
 source-dirs:
