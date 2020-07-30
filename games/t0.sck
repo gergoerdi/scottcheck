@@ -1,0 +1,19 @@
+start throne
+treasury throne
+
+action score: score
+
+room throne "gorgeously decorated throne room"
+	exit south corridor
+
+item sign "Sign says: leave treasure here, then say SCORE"
+
+room corridor "N-S corridor"
+       exit north throne
+       exit south chamber
+
+room chamber "square chamber"
+	exit north corridor
+
+item coin "*Gold coin*"
+	called "coin"
