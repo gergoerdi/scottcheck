@@ -24,7 +24,7 @@ data S = S
     { _currentRoom :: Int16
     , _needLook :: Bool
     , _itemLocations :: Array Int16 Int16
-    , _dead :: Bool
+    , _endState :: Maybe Bool
     } deriving Show
 makeLenses ''S
 
@@ -45,7 +45,7 @@ initState game = S
     { _currentRoom = gameStartRoom game
     , _needLook = True
     , _itemLocations = fmap (\(Item _ _ _ loc) -> loc) $ gameItems game
-    , _dead = False
+    , _endState = Nothing
     }
 
 runGame :: Game -> Engine a -> State S (a, [String])
@@ -75,29 +75,11 @@ look = do
         say "I can also see:"
         mapM_ (\desc -> say $ " * " <> desc) itemsHere
 
-score :: Engine Int16
-score = do
-    treasury <- asks gameTreasury
-    items <- asks gameItems
-    itemLocations <- use itemLocations
-    let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
-    return $ count (== treasury) treasureLocs
-
 die :: Engine ()
-die = dead .= True
+die = endState .= Just False
 
 finished :: Engine (Maybe Bool)
-finished = do
-    dead <- use dead
-
-    maxScore <- asks gameMaxScore
-    score <- score
-    let haveAllTreasure = score == maxScore
-
-    return $
-      if dead then Just False else
-      if haveAllTreasure then Just True else
-      Nothing
+finished = use endState
 
 parseInput :: Game -> String -> String -> Maybe Input
 parseInput Game{..} w1 w2 = case (verb, noun) of
@@ -243,7 +225,16 @@ execInstr instr = case instr of
 
     gameOver = lift die
 
-    showScore = lift $ say "SCORE"
+    showScore = lift $ do
+        treasury <- asks gameTreasury
+        items <- asks gameItems
+        itemLocations <- use itemLocations
+        let treasureLocs = [ loc | (loc, Item True _ _ _) <- zip (A.elems itemLocations) (A.elems items) ]
+            score = count (== treasury) treasureLocs
+        maxScore <- asks gameMaxScore
+        say $ "Your score is " <> show score <> " out of a possible " <> show maxScore <> "."
+        when (score == maxScore) $ endState .= Just True
+
     showInventory = lift $ say "INVENTORY"
     lookAround = lift look
 
