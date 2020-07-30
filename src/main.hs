@@ -61,7 +61,7 @@ solve :: Game -> IO ()
 solve theGame = do
     let genWord name i = do
             word <- freshVar $ printf "%s@%d" name (i :: Int)
-            constrain $ 0 .<= word .&& word .< literal (gameDictSize theGame)
+            constrain $ (-1) .<= word .&& word .< literal (gameDictSize theGame)
             return word
         genInput i = do
             verb <- genWord "verb" i
@@ -77,7 +77,8 @@ solve theGame = do
                     ite (SBV.isJust end2) (return $ SBV.fromJust end2) (return sFalse)
             return finished
 
-    let resolve (v, n) = (gameVerbsRaw theGame ! v, gameNounsRaw theGame ! n)
+    let resolveFrom dict w = if w < 0 then "" else dict theGame ! w
+        resolve (v, n) = (resolveFrom gameVerbsRaw v, resolveFrom gameNounsRaw n)
 
     mapM_ (print . resolve) cmds
 
