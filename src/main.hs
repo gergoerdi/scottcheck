@@ -80,7 +80,11 @@ solve theGame = do
     let resolveFrom dict w = if w < 0 then "" else dict theGame ! w
         resolve (v, n) = (resolveFrom gameVerbsRaw v, resolveFrom gameNounsRaw n)
 
-    mapM_ (print . resolve) cmds
+    putStrLn "Solution found:"
+    forM_ (zip [(1 :: Int)..] cmds) $ \(i, cmd) -> do
+        let (v, n) = resolve cmd
+        printf "%3d. %s %s\n" i v n
+        pure ()
 
 play :: Game -> IO ()
 play theGame = runSMT $ query $ go $ initState theGame
