@@ -9,12 +9,12 @@ packages:
     version: 8.7.5
     git: https://github.com/LeventErkok/sbv.git
     pantry-tree:
-      size: 61875
-      sha256: c33fa4b43fb6397e06903a7efa4b6d104a179cbec26418e687bd7a3d90d0e22d
-    commit: 9d71991feb0ef424d7108a0e9f0bc9ebe31aabce
+      size: 62465
+      sha256: 2e0ce13335b290bc7e0c2499aaf92f7a8ca326d33694fdfa2838aa7000fdc8e8
+    commit: 34d836ad2978805343f07702a2fcd6b4bfd05c1c
   original:
     git: https://github.com/LeventErkok/sbv.git
-    commit: 9d71991feb0ef424d7108a0e9f0bc9ebe31aabce
+    commit: 34d836ad2978805343f07702a2fcd6b4bfd05c1c
 snapshots:
 - completed:
     size: 531696

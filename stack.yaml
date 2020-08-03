@@ -2,4 +2,4 @@ resolver: lts-16.3
 
 extra-deps:
   - git: https://github.com/LeventErkok/sbv.git
-    commit: 9d71991feb0ef424d7108a0e9f0bc9ebe31aabce
+    commit: 34d836ad2978805343f07702a2fcd6b4bfd05c1c
