@@ -7,6 +7,11 @@ import Data.SBV.Control
 import Control.Monad.State
 import Data.SBV.Maybe (sJust, sNothing)
 
+fillArray :: (Ix a, SymArray sarr, SymVal a, SymVal b) => Array a b -> sarr a b -> sarr a b
+fillArray arr sarr = foldr write sarr (A.assocs arr)
+  where
+    write (i, x) sarr = writeArray sarr (literal i) (literal x)
+
 (.!) :: (Mergeable a) => Array Int16 a -> SInt16 -> a
 xs .! i = case A.elems xs of
     [] -> error "(.!) : empty array"
