@@ -134,8 +134,7 @@ builtin (verb, noun) = sCase verb
     builtin_get = do
         locs <- use itemLocations
         here <- use currentRoom
-        items <- asks gameItems
-        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        item <- parseItem
         ite (select (A.elems locs) (-1) item ./= here) (say_ "It's beyond my power to do that.") $ do
             move item (literal carried)
             say_ "OK."
@@ -143,11 +142,14 @@ builtin (verb, noun) = sCase verb
     builtin_drop = do
         locs <- use itemLocations
         here <- use currentRoom
-        items <- asks gameItems
-        let item = SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
+        item <- parseItem
         ite (select (A.elems locs) (-1) item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
             move item here
             say_ "OK."
+
+    parseItem = do
+        items <- asks gameItems
+        return $ SBV.fromMaybe (-1) $ sFindIndex (\(Item _ name _ _) -> maybe sFalse ((noun .==) . literal) name) $ A.elems items
 
 type SCondition = (SInt16, SInt16)
 type SInstr = SInt16
