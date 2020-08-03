@@ -31,7 +31,7 @@ type SInput = (SInt16, SInt16)
 data S = S
     { _currentRoom :: SInt16
     , _needLook :: SBool
-    , _itemLocations :: SArray Int16 Int16
+    , _itemLocations :: SFunArray Int16 Int16
     , _endState :: SMaybe Bool
     } deriving (Show, Generic, Mergeable)
 makeLenses ''S
@@ -51,7 +51,7 @@ say = tell . (:[])
 say_ :: String -> Engine ()
 say_ = say . literal
 
-initState :: Game -> SArray Int16 Int16 -> S
+initState :: Game -> SFunArray Int16 Int16 -> S
 initState game arr = S
     { _currentRoom = literal $ gameStartRoom game
     , _needLook = sTrue
