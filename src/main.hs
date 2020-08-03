@@ -68,7 +68,8 @@ solve theGame = do
             noun <- genWord "noun" i
             return $ SBV.tuple (verb, noun)
     cmds <- runSMT $ do
-        query $ loopState genInput (initState theGame) $ \cmd -> do
+        arr <- newArray "items" Nothing
+        query $ loopState genInput (initState theGame arr) $ \cmd -> do
             let (verb, noun) = SBV.untuple cmd
             (finished, output) <- runGame theGame $ do
                 end1 <- stepWorld
@@ -87,7 +88,9 @@ solve theGame = do
         pure ()
 
 play :: Game -> IO ()
-play theGame = runSMT $ query $ go $ initState theGame
+play theGame = runSMT $ do
+    arr <- newArray "items" Nothing
+    query $ go $ initState theGame arr
   where
     input = do
         putStr "> "
