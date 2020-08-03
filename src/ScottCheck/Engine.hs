@@ -200,12 +200,11 @@ performMatching (verb, noun) = do
   where
     loop handled [] = return handled
     loop handled (action@(SAction (verb', noun') conds instrs):actions) = do
-        ite (sNot $ match (verb', noun')) (loop handled actions) $ do
-            this <- do
-                (bs, args) <- partitionEithers <$> mapM evalCond conds
-                let b = sAnd bs
-                ite b (exec args instrs) (return sFalse)
-            ite this (ite auto (loop sTrue actions) (return sTrue)) (loop handled actions)
+        this <- ite (sNot $ match (verb', noun')) (return sFalse) $ do
+            (bs, args) <- partitionEithers <$> mapM evalCond conds
+            let b = sAnd bs
+            ite b (exec args instrs) (return sFalse)
+        ite this (ite auto (loop sTrue actions) (return sTrue)) (loop handled actions)
 
     match (verb', noun') = verb' .== verb .&& (auto .|| noun' .== 0 .|| noun' .== noun)
     auto = verb .== 0
