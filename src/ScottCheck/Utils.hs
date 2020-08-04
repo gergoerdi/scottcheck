@@ -6,11 +6,12 @@ import Data.SBV
 import Data.SBV.Control
 import Control.Monad.State
 import Data.SBV.Maybe (sJust, sNothing)
+import Data.List (foldl')
 
 fillArray :: (Ix a, SymArray sarr, SymVal a, SymVal b) => Array a b -> sarr a b -> sarr a b
-fillArray arr sarr = foldr write sarr (A.assocs arr)
+fillArray arr sarr = foldl' write sarr (A.assocs arr)
   where
-    write (i, x) sarr = writeArray sarr (literal i) (literal x)
+    write sarr (i, x) = writeArray sarr (literal i) (literal x)
 
 (.!) :: (Mergeable a) => Array Int16 a -> SInt16 -> a
 xs .! i = case A.elems xs of
