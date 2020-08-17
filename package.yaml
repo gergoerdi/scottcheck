@@ -1,6 +1,7 @@
 name: ScottCheck
 version: 0.1.0
 category: game
+license: MIT
 
 dependencies:
   - base
