@@ -197,9 +197,18 @@ evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
     sCase op
       [ (1, isItemAt (literal carried))
       , (2, isItemAt =<< use currentRoom)
+      , (3, itemAvailable)
       , (4, uses currentRoom (.== dat))
+      , (5, sNot <$> (isItemAt =<< use currentRoom))
       , (6, sNot <$> isItemAt (literal carried))
+      , (7, sNot <$> uses currentRoom (.== dat))
+      , (10, someCarried)
+      , (11, sNot <$> someCarried)
       , (12, sNot <$> itemAvailable)
+      , (13, sNot <$> isItemAt (literal 0))
+      , (14, isItemAt (literal 0))
+      , (17, itemHasMoved)
+      , (18, sNot <$> itemHasMoved)
       ]
       (return sTrue)
   where
@@ -211,6 +220,16 @@ evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
         loc <- uses itemLocations (.! dat)
         here <- use currentRoom
         return $ loc .== literal carried .|| loc .== here
+
+    someCarried = do
+        locs <- use itemLocations
+        return $ sAny (.== literal carried) $ A.elems locs
+
+    itemHasMoved = do
+        loc <- uses itemLocations (.! dat)
+        locs0 <- asks gameItems
+        let loc0 = fmap (\(Item _ _ _ loc) -> literal loc) locs0 .! dat
+        return $ loc ./= loc0
 
 type Exec = StateT [SInt16] Engine
 
