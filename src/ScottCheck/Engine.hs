@@ -30,6 +30,7 @@ type SInput = (SInt16, SInt16)
 
 data S = S
     { _currentRoom :: SInt16
+    , _savedRoom :: SInt16
     , _needLook :: SBool
     , _itemLocations :: Array Int16 SInt16
     , _endState :: SMaybe Bool
@@ -54,6 +55,7 @@ say_ = say . literal
 initState :: Game -> S
 initState game = S
     { _currentRoom = literal $ gameStartRoom game
+    , _savedRoom = literal 0
     , _needLook = sTrue
     , _itemLocations = fmap (\(Item _ _ _ loc) -> literal loc) $ gameItems game
     , _endState = sNothing
@@ -230,12 +232,21 @@ execInstr instr =
     ite (102 .<= instr) (msg $ instr - 50) $
     sCase instr
         [ (0, return ())
+        , (53, bringHere)
         , (54, teleport)
+        , (55, destroy)
+        , (59, destroy)
+        , (62, moveTo)
         , (63, gameOver)
         , (64, lookAround)
         , (65, showScore)
         , (66, showInventory)
         , (72, swapItems)
+        , (74, takeItem)
+        , (75, moveNextTo)
+        , (76, lookAround)
+        , (80, swapRoom)
+        , (88, return ()) -- Sleep 2s...
         ]
         (return ())
   where
@@ -243,9 +254,27 @@ execInstr instr =
         s <- asks $ (.! i) . fmap literal . gameMessages
         say s
 
+    bringHere = do
+        item <- nextArg
+        here <- lift $ use currentRoom
+        lift $ move item here
+
+    moveTo = do
+        item <- nextArg
+        room <- nextArg
+        lift $ move item room
+
+    takeItem = do
+        item <- nextArg
+        lift $ move item (literal carried)
+
     teleport = do
         room <- nextArg
         lift $ currentRoom .= room
+
+    destroy = do
+        item <- nextArg
+        lift $ move item 0
 
     gameOver = lift die
 
@@ -272,6 +301,19 @@ execInstr instr =
             loc2 <- uses itemLocations (.! item2)
             move item1 loc2
             move item2 loc1
+
+    swapRoom = lift $ do
+        here <- use currentRoom
+        there <- use savedRoom
+        savedRoom .= here
+        currentRoom .= there
+
+    moveNextTo = do
+        item <- nextArg
+        target <- nextArg
+        lift $ do
+            loc <- uses itemLocations (.! target)
+            move item loc
 
 move :: SInt16 -> SInt16 -> Engine ()
 move item loc = itemLocations %= replaceAt item loc
