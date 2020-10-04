@@ -1,8 +1,10 @@
 {-# LANGUAGE RecordWildCards, TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric, DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RebindableSyntax #-}
 module ScottCheck.Engine where
 
+import Prelude
 import ScottCheck.GameData
 import ScottCheck.Utils
 
@@ -122,13 +124,14 @@ builtin (verb, noun) = sCase verb
     ]
     (return ())
   where
-    builtin_go = ite (sNot $ 1 .<= noun .&& noun .<= 6) badDir $ do
+    builtin_go = if (sNot $ 1 .<= noun .&& noun .<= 6) then badDir else do
         let dir = noun - 1
         here <- use currentRoom
         SRoom exits _ <- asks $ (.! here) . fmap sRoom . gameRooms
         let newRoom = select exits 0 dir
-        ite (newRoom .== 0) blocked $ do
-            currentRoom .= newRoom
+        if (newRoom .== 0)
+          then blocked
+          else currentRoom .= newRoom
       where
         badDir = say_ "I don't know how to go in that direction"
         blocked = say_ "I can't go in that direction."
@@ -137,7 +140,9 @@ builtin (verb, noun) = sCase verb
         locs <- use itemLocations
         here <- use currentRoom
         item <- parseItem
-        ite (select (A.elems locs) (-1) item ./= here) (say_ "It's beyond my power to do that.") $ do
+        if select (A.elems locs) (-1) item ./= here
+          then say_ "It's beyond my power to do that."
+          else do
             move item (literal carried)
             say_ "OK."
 
@@ -145,7 +150,9 @@ builtin (verb, noun) = sCase verb
         locs <- use itemLocations
         here <- use currentRoom
         item <- parseItem
-        ite (select (A.elems locs) (-1) item ./= literal carried) (say_ "It's beyond my power to do that.") $ do
+        if select (A.elems locs) (-1) item ./= literal carried
+          then say_ "It's beyond my power to do that."
+          else do
             move item here
             say_ "OK."
 
@@ -179,9 +186,9 @@ performMatching (verb, noun) = do
   where
     loop [] = return sFalse
     loop (action@(SAction (verb', noun') conds instrs):actions) = do
-        ite (sNot $ match (verb', noun')) (loop actions) $ do
+        if sNot $ match (verb', noun') then loop actions else do
             b <- execIf conds instrs
-            ite b (return sTrue) (loop actions)
+            if b then return sTrue else loop actions
 
     match (verb', noun') = verb' .== verb .&& (noun' .== 0 .|| noun' .== noun)
 
@@ -193,7 +200,7 @@ execIf conds instrs = do
     return b
 
 evalCond :: SCondition -> Engine (Either SBool SInt16)
-evalCond (op, dat) = ite (op .== 0) (return $ Right dat) $ fmap Left $
+evalCond (op, dat) = if op .== 0 then return (Right dat) else fmap Left $
     sCase op
       [ (1, isItemAt (literal carried))
       , (2, isItemAt =<< use currentRoom)
@@ -247,8 +254,8 @@ exec args instrs = flip evalStateT args $ mapM_ execInstr instrs
 
 execInstr :: SInstr -> Exec ()
 execInstr instr =
-    ite (1 .<= instr .&& instr .<= 51) (msg instr) $
-    ite (102 .<= instr) (msg $ instr - 50) $
+    if 1 .<= instr .&& instr .<= 51 then msg instr else
+    if 102 .<= instr then msg (instr - 50) else
     sCase instr
         [ (0, return ())
         , (53, bringHere)
